@@ -20,7 +20,7 @@
 ### Goal of the week for each individual member
 프로젝트 전반에 대한 이해는 모든 member에게 필수적이기 때문에 각자 *Goal of the week*를 수행하고 다음 meeting에서 공유 및 구체적인 milestone을 세운다.
 
-<hr>
+<br>
 
 ## Week 2
 > 10/30(일) meeting 진행
@@ -43,4 +43,3 @@
 |김민결|- pivoting이 잘 되어 있다는 가정 하에 Shuffling method 디자인(10/30 미팅에서 Shuffling을 위한 여러 가지 방법들이 논의되었으나, Shuffling method를 하나로 결정할 필요 있음) <br/> - External Merge Sort 구현|
 |이희우|- scalaPB를 이용한 gRPC handler demo 구현 <br/> - github commit convention 정하기|
 |최정원|- master에서 사용되는 sampling algorithm 구현 후 pivot 계산을 잘 수행하는지 검증하기 <br/> - test case 설계 및 test environment 구상하기 <br/> - databricks scala style guide를 기반으로 coding convention 정하기|
-|||
