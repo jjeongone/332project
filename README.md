@@ -43,3 +43,34 @@
 |김민결|- pivoting이 잘 되어 있다는 가정 하에 Shuffling method 디자인(10/30 미팅에서 Shuffling을 위한 여러 가지 방법들이 논의되었으나, Shuffling method를 하나로 결정할 필요 있음) <br/> - External Merge Sort 구현|
 |이희우|- scalaPB를 이용한 gRPC handler demo 구현 <br/> - github commit convention 정하기|
 |최정원|- master에서 사용되는 sampling algorithm 구현 후 pivot 계산을 잘 수행하는지 검증하기 <br/> - test case 설계 및 test environment 구상하기 <br/> - databricks scala style guide를 기반으로 coding convention 정하기|
+
+<br>
+
+# Week 3
+> 11/6(일) meeting 진행
+
+### Weekly Progress
+- 용어 통일
+- gRPC의 전반적인 작동 방식 및 demo 진행상황 공유
+- github commit convention 결정
+- scala coding style convention 결정
+- sampling method 검증 및 전체적인 flow에서 sampling 순서 결정
+- test environment 설정에 있어 docker를 사용하기로 결정
+- device spec 결정
+- 개발환경 통일
+  - scala `2.13.8`
+- 전체적인 flow 도식화
+
+### Goal of the week
+- flow chart 완성
+- 개발 시작
+- unit test는 개발과 동시진행
+- test case 고민
+- partitioning 구현
+
+### Goal of the week for each individual member
+|member|goal|
+|:---:|---|
+|김민결|- external merge sort library 실행 <br/> - partitioning 구현|
+|이희우|- master, worker간의 asynchronous 방법론 탐색(worker로부터 정보를 모두 받고 master가 연산을 수행) <br/> - message 통신 <br/> - project initiate|
+|최정원|- docker를 이용한 master, worker 환경 설정(가장 기본적인 상황을 가정) + partition size 고민 <br/> - sampling algorithm scala 상에 구현 <br/> - gensort로 데이터 생성 및 test 환경에 적용 <br/> - flow chart 정리|
