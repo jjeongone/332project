@@ -1,6 +1,6 @@
 # [CSED332] SD Team Project: External Merge Sort 
 
-회의록이나 document에 대해서는 다음 [링크](https://jjeongone.notion.site/CSED322-SD-Team-Project-eb2b3814d554467c93a8c22ec02c53d7)에서 확인하실 수 있습니다. `Document` 디렉토리에는 개발 정보가 저장되어 있고, `Note` 디렉토리에는 회의록이 정리되어 있습니다.
+회의록이나 document에 대해서는 다음 [링크](https://jjeongone.notion.site/CSED322-SD-Team-Project-eb2b3814d554467c93a8c22ec02c53d7)에서 확인하실 수 있습니다. `Document` 디렉토리에는 개발 정보가 저장되어 있고, `Meeting Log` 항목에는 주차별 회의록이 정리되어 있습니다.
 
 ## Week 1
 > 10/21(금) meeting 진행
@@ -74,3 +74,30 @@
 |김민결|- external merge sort library 실행 <br/> - partitioning 구현|
 |이희우|- master, worker간의 asynchronous 방법론 탐색(worker로부터 정보를 모두 받고 master가 연산을 수행) <br/> - message 통신 <br/> - project initiate|
 |최정원|- docker를 이용한 master, worker 환경 설정(가장 기본적인 상황을 가정) + partition size 고민 <br/> - sampling algorithm scala 상에 구현 <br/> - gensort로 데이터 생성 및 test 환경에 적용 <br/> - flow chart 정리|
+
+<br>
+
+# Week 4
+> 11/13(일) meeting 진행
+
+### Weekly Progress
+- java library를 이용하여 external merge sort 구현
+- master-worker간 gRPC를 통한 connection 구현 
+- gensort를 통한 data set generation
+- flow chart 정리
+- 가상환경 세팅(진행중)
+
+### Goal of the week
+- 각자 local에 VM 세팅
+- master와 worker setting을 쉽게 하기 위한 스크립트 작성
+- VM 환경에서 external merge sort 작동 여부 확인
+- server-client 간 port number를 이용한 통신이 잘 이루어지는지 확인
+- gensort로 생성한 file에 대해 sampling algorithm과 pivoting이 잘 작동하는지 확인
+
+### Goal of the week for each individual member
+|member|goal|
+|:---:|---|
+|공통|- progress presentation 발표자료 제작|
+|김민결|- VM 환경에서 external sorting library 구동 확인 및 partitioning 검증 <br/> - Flow chart 기반으로 data type 결정|
+|이희우|- server에서 여러 client들의 requests를 기다렸다가 한꺼번에 response 처리하는 코드 구현 <br/> - device간 file이나 array 통신 <br/> 각 machine의 port 번호 읽어오는 코드 작성 |
+|최정원|- sampling algorithm 및 pivoting 구현 <br/> - VM 개발환경 설정법 document 공유 (~11/14) <br/> - gensort를 이용하여 해당 worker에 요구되는 만큼의 file block 생성하는 스크립트 작성 |
