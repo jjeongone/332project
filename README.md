@@ -82,6 +82,7 @@
 
 ### Weekly Progress
 - java library를 이용하여 external merge sort 구현
+- partitioning 구현
 - master-worker간 gRPC를 통한 connection 구현 
 - gensort를 통한 data set generation
 - flow chart 정리
