@@ -102,3 +102,35 @@
 |김민결|- VM 환경에서 external sorting library 구동 확인 및 partitioning 검증 <br/> - Flow chart 기반으로 data type 결정|
 |이희우|- server에서 여러 client들의 requests를 기다렸다가 한꺼번에 response 처리하는 코드 구현 <br/> - device간 file이나 array 통신 <br/> 각 machine의 port 번호 읽어오는 코드 작성 |
 |최정원|- sampling algorithm 및 pivoting 구현 <br/> - VM 개발환경 설정법 document 공유 (~11/14) <br/> - gensort를 이용하여 해당 worker에 요구되는 만큼의 file block 생성하는 스크립트 작성 |
+
+<br>
+
+# Week 5
+> 11/20(일) meeting 진행
+
+*앞으로 언급하는 test 환경은 모두 docker container를 의미하며, machine spec은 다음과 같다.*
+
+Ubuntu `22.04`, Java `1.8.0` (openjdk-8), scala `2.13.8`
+
+### Weekly Progress
+- gRPC를 이용한 file, array 통신
+- machine (master, worker) 내부적으로 IP address 확인하는 코드 구현
+- server에서 여러 client의 request를 기다렸다가 한꺼번에 처리하는 코드 구현
+- test 환경에서 file block 단위의 sample dataset에 대해 external merge sort 작동 확인
+- test 환경에서 임의의 sample dataset에 대해 partitioning 작동 확인
+- shell script를 통해 worker container가 실행될 때 2GB의 test data를 gensort로 generation하도록 구현
+- type definition 정리
+
+### Goal of the week
+- 현재까지 구현된 master, worker 내부 함수에 대한 검증
+- Docker를 통해 설정한 test환경이 실제 machine 환경과 유사하게 작동하는지 확인
+- 각자 구현한 코드 합치는 작업
+- gRPC를 이용한 통신 구현 파트 분배: 다른 부분에 비해 통신이 많은 비중을 차지하고 있기 때문에 우선적으로 automic하게 분배할 수 있도록 역할분배를 하였고, 지금부터는 서로 communication을 통해 적절한 dependency를 가지도록 업무분배를 하여 개발 진행
+
+### Goal of the week for each individual member
+|member|goal|
+|:---:|---|
+|공통|- 지금까지 작업한 부분 git에 branch 생성하여 업로드|
+|김민결|- 더 큰 gensort input file에 대해서도 external merge sort가 잘 작동하는지 test <br/> - mergeDone message를 전송함에 있어 요구되는 함수 구현 <br/> - mergeDone message를 수신한 후 master에서 sorting이 잘 이루어졌는지 확인하는 validation 코드 구현|
+|이희우|- gRPC를 이용한 file 통신 구현 <br/> - gRPC 통신이 완료된 후 machine termination 구현 <br/> - test 환경에서 IP address를 잘 출력하는지 확인 <br/> - gRPC를 이용한 통신 구현 분배|
+|최정원|- type definition을 적용하여 sampling, setPivot 함수 수정 <br/> - test 환경에서 sampling, setPivot 함수 작동 확인 <br/> - Docker network 작동 방식 확인|
