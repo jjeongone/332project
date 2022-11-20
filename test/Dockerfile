@@ -21,6 +21,7 @@ WORKDIR /home
 
 RUN mkdir gensort
 RUN mkdir data
+RUN mkdir output
 
 COPY gensort-linux-1.5.tar /home/gensort
 
@@ -28,11 +29,12 @@ WORKDIR /home/gensort
 
 RUN tar -xvf gensort-linux-1.5.tar
 
+COPY gensort-generator.sh /home/gensort/64
+
 WORKDIR /home/gensort/64
 
-RUN ./gensort -a 330000 partition1
-RUN ./gensort -a 330000 partition2
-RUN mv partition1 partition2 /home/data
+RUN chmod +x gensort-generator.sh
+RUN ./gensort-generator.sh
 
 WORKDIR /home
 
