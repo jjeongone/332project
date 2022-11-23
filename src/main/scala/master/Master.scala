@@ -85,6 +85,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             workerDone = workerDone.appended((address, pivot))
             if (workerDone.length == workerCount) {
                 // pass workerDone and workers and validation
+                // call function in MasterJob.scala
                 self.stop()
             }
         }
@@ -106,6 +107,11 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             Future.successful(reply)
         }
 
+        
+        /** "master-worker" service
+          * functionality mainly done by setPivots in MasterJob.scala
+          * - wait for all workers request by CountDownLatch 
+          */
         override def getWorkerPivots(responseObserver: StreamObserver[PivotResponse]): StreamObserver[PivotRequest] = {
             new StreamObserver[PivotRequest]() {
                 var writer: OutputStream = null
@@ -141,6 +147,13 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             }
         }
 
+        /** getPartitionInfo
+          * - wait for all workers to send partition info by using CountDownLatch
+          * - get all the information from lists and filter each worker Address from other worker's list -> call user defined function from MasterJob
+          * - redistribute file names to according worker address -> in form of List[(WorkerAddress, List[FileName])]
+          */
+
+        
         override def mergeDone(req: DoneRequest) = {
             doneWorker(req.address, req.pivot.get)
             val reply = DoneResponse(ok = true)

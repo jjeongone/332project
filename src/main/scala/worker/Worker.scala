@@ -45,7 +45,7 @@ object Worker {
 
                 }
                 else {
-                    client.externalSort(inputFileDirectory)
+                    client.externalMergeSort(inputFileDirectory)
                     //client.sample()
                     
                     client.mergeDone()
@@ -62,17 +62,29 @@ class Worker private(
     private val channel: ManagedChannel, 
     private val blockingStub: SorterBlockingStub
 ) {
+    type Pivot = (String, String)
+    type WorkerAddress = String 
+    type FileAddress = String
+    type Worker = (WorkerAddress, Pivot)
+
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
-    private val address: String = getIPaddress
+    private val myAddress: WorkerAddress = getIPaddress
     private var min: String = "0"
     private var max: String = "1"
+    private var sortedFileDirectory: FileAddress = null
+    private var partitionedFileDirectory: FileAddress = null
+    private var shuffledFileDirectory: FileAddress = null
+    private var samples: List[String] = null 
+    private var workerPivots: List[Worker] = null 
+    private var partitionRecord: List[(WorkerAddress, List[String])] = null 
+    private var partitionInfo: List[(WorkerAddress, List[String])] = null 
 
     def shutdown(): Unit = {
         channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
     }
 
     def register(): Boolean = {
-        val request = RegisterRequest(address = address)
+        val request = RegisterRequest(address = myAddress)
         try {
             val response = blockingStub.registerWorker(request)
             if (response.success) {
@@ -90,56 +102,64 @@ class Worker private(
         }
     }
 
-    /*
-    Given list of address, external sort function uses reads file from such addresss and sorts file into some other address. 
-    - functionality: files in directorys are made into one file in temporary address
-    Heewoo:
-        V pass Input address and check if address is successfully passed 
-        - do not return any return value 
-    */
-    def externalSort(inputFileDirectory: Array[String]): Unit = {
-        inputFileDirectory.foreach(System.out.println)
-    }
+    /** "worker main" function 
+      * Given list of address, external sort function uses adddresses to read file and sort those files.
+      * Sorted temporary files would be placed in user defined path or in same path with different name.
+      * - call user function "externalMergeSort" in WorkerJob.scala
+      * - save output file path in sortedFileDirectory
+      */
+    def externalMergeSort(inputFileDirectory: Array[FileAddress]): Unit = ???
 
-    /*
-    sample function extracts some data from sorted file and gives output of file 
-    such file need to be passed to server
+    /** "worker main" function 
+      * functionality: sample function extracts some data from sorted file and gives output as File format
+      *  - extracts samples from sorted file stored
+      *  - saves sample in Array of samples 
+      * - call user sampling function in WorkerJob.scala
+      */
+    def sampling(): Unit = ???
 
-    Heewoo: 
-        - address of external sorted file is given and as a output sample file is given
-    
-    PseudoWorkerJob: 
-        - returns file with some values in it 
-    */
-    def sample(): File = ???
+    /* "master-worker" function
+     * functionality: send request to master with samples and get pivot and address information of all workers
+     * - send request with samples array and worker address
+     * - get list of pivot range and address of other workers -> saved in workerPivots
+     */
+    def getWorkerPivots() = ???
 
-    def getPivots() = ???
+    /** "worker main" function 
+      * functionality: read pivot range from list workerPivots
+      * - partition files in sortedOutputFileDirectory by pivot range in workerPivots
+      * - save partitioned file in user defined path, partitionedFileDirectory
+      * - record list of partition file name in second place of tuple -> save record in var partitionRecord
+      * - move my range partitioned file to shuffledFileDirectory
+      */
+    def partitionByPivot() = ???
 
-    /*
-    extracts pivot range from distributed worker-pivot list and partition file 
+    /** "master-worker" function 
+      * functionality: get information of my partitioned file distribution in other worker
+      * - give partitionRecord to master
+      * - get List of List[(WorkerAddress, List[PartitionFileName])] from master
+      */
+    def getPartitionInfo() = ???
 
-    PseudoWorkerJob: 
-        - returns partitioned List[(Worker, List(Partitioned file names))]
-        
-    Message Relation: 
-        - gets partition file count and send to master
-        - 
-    */
-    def partition() = ???
-
-    /*
-    shuffle between workers 
-    */
-    def shuffle() = ???
+    /** "worker-worker" function
+      * functionality: shuffle partitioned file based on partitionInfo 
+      * - continue shuffling until all partitioned file is received to worker space
+      * - if shuffling done start mergeIntoSortedFile
+      * - save shuffled file in shuffledFileDirectory
+      */
+    def shuffling() = ???
  
-    /*
-    merge happens in between after shuffle 
-    */
-    def merge() = ???
+    /** "worker main" function
+      * functionality: merge all received partitioned file in 
+      * - call function from WorkerJob.scala
+      * - save file in outputFileDirectory 
+      * - save min and max value of merged data
+      */
+    def mergeIntoSortedFile() = ???
 
     def mergeDone() = {
         val pivot = Option(Pivot(min = min, max = max))
-        val request = DoneRequest(address = address, pivot = pivot)
+        val request = DoneRequest(address = myAddress, pivot = pivot)
         try {
             val response = blockingStub.mergeDone(request)
             logger.info("alerted master that merging is done and terminating...")
