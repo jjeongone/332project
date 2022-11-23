@@ -113,18 +113,7 @@ class Worker private(
     */
     def sample(): File = ???
 
-    def getPivots() = {
-        val pivot = Option(Pivot(min = min, max = max))
-        val request = DoneRequest(address = address, pivot = pivot)
-        try {
-            val response = blockingStub.mergeDone(request)
-            logger.info("alerted master that merging is done and terminating...")
-        } 
-        catch {
-            case e: StatusRuntimeException =>
-            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
-        }
-    }
+    def getPivots() = ???
 
     /*
     extracts pivot range from distributed worker-pivot list and partition file 
