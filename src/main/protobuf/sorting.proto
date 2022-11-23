@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package cs332.protos;
+
+message Pivot {
+  string min = 2;
+  string max = 3;
+}
+
+message Worker {
+  string address = 1;
+  Pivot pivot = 2;
+}
+
+message MetaData {
+  string address = 1;
+  string name = 2;
+  string fileType = 3;
+}
+
+message File {
+  bytes content = 1;
+}
+
+enum Status {
+  PENDING = 0;
+  IN_PROGRESS = 1;
+  SUCCESS = 2;
+  FAILED = 3;
+}
+
+service Sorter {
+  rpc registerWorker (RegisterRequest) returns (RegisterResponse) {}
+  rpc getWorkerPivots (stream PivotRequest) returns (PivotResponse) {}
+  rpc mergeDone (DoneRequest) returns (DoneResponse) {}
+}
+
+message RegisterRequest {
+  string address = 1;
+}
+
+message RegisterResponse {
+  bool success = 1;
+}
+
+message PivotRequest {
+  oneof info {
+    MetaData metadata = 1;
+    File file = 2;
+  }
+}
+
+message PivotResponse {
+  Status status = 1;
+  repeated Worker worker = 2;
+}
+
+message DoneRequest {
+  string address = 1;
+  Pivot pivot = 2;
+}
+
+message DoneResponse {
+  bool ok = 1;
+}
+
