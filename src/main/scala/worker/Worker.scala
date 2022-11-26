@@ -14,7 +14,8 @@ object Worker {
     def apply(host: String, port: Int): Worker = {
         val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build
         val blockingStub = SorterGrpc.blockingStub(channel)
-        new Worker(channel, blockingStub)
+        val newStub = SorterGrpc.newStub(channel)
+        new Worker(channel, blockingStub, newStub)
     }
 
 
@@ -60,7 +61,8 @@ object Worker {
 
 class Worker private(
     private val channel: ManagedChannel, 
-    private val blockingStub: SorterBlockingStub
+    private val blockingStub: SorterBlockingStub,
+    private val newStub: SorterStub
 ) {
     type Pivot = (String, String)
     type WorkerAddress = String 
@@ -116,7 +118,25 @@ class Worker private(
       *  - saves sample in Array of samples 
       * - call user sampling function in WorkerJob.scala
       */
-    def sampling(): Unit = ???
+    def sampling(): Unit = {
+        StreamObserver[PivotRequest] streamObserver = newStub.getWorkerPivots(new FileUploadObserver())
+        
+        Path path = Paths.get()
+
+        Metadata metadata = Metadata(address = myAddress, name = "sample", fileType = ".1")
+        val metaRequest = PivotRequest(metadata = metadata)
+
+        streamObserver.onNext(metadata)
+
+        InputStream inputStream = Files.newInputStream(path)
+        var bytes = Array.ofDim[Byte](4096)
+        var size: Int = 0
+        while (size = inputStream.read(bytes) > 0){
+            val file = File()
+            val fileRequest = PivotRequest()
+            streamObserver.onNext(request)
+        }
+    }
 
     /* "master-worker" function
      * functionality: send request to master with samples and get pivot and address information of all workers
