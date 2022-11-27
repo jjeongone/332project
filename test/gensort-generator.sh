@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 i=0
 num=64
