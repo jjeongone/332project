@@ -46,7 +46,8 @@ object Partitioning {
         val resultFiles = result.map((keyval: (Address, (List[File], (Int, Int)))) => (keyval._1, keyval._2._1))
         val resultNamingIndex = result.map((keyval: (Address, (List[File], (Int, Int)))) => (keyval._1, keyval._2._2))
         executePartitionByPivotAux(unionMap(acc, resultFiles), namingIndex ++ resultNamingIndex)
-      } else {
+      }
+      else {
         acc
       }
     }
