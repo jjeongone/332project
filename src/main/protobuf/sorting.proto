@@ -13,12 +13,11 @@ message Worker {
 }
 
 message Metadata {
-  string address = 1;
-  string name = 2;
-  string fileType = 3;
+  string fileName = 1;
+  string fileType = 2;
 }
 
-message File {
+message FileMessage {
   bytes content = 1;
 }
 
@@ -40,21 +39,17 @@ message RegisterRequest {
 }
 
 message RegisterResponse {
-  bool success = 1;
+  int32 workerNum = 1;
 }
 
 message PivotRequest {
-  oneof info {
-    MetaData metadata = 1;
-    File file = 2;
-  }
+  Metadata metadata = 1;
+  FileMessage file = 2;
 }
 
 message PivotResponse {
   Status status = 1;
-  repeated Worker worker = 2;
 }
-
 message DoneRequest {
   string address = 1;
   Pivot pivot = 2;

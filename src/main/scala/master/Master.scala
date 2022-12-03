@@ -66,14 +66,16 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
         System.out.println(getIPaddress + ":" + Master.port)
     }
 
-    private def addWorker(address: String): Unit = {
+    private def addWorker(address: String): Int = {
+        var workerNum = -1
         this.synchronized{
+            workerNum = workers.length
             workers = workers.appended(address)
             if (workers.length == workerCount) {
                 printWorkers()
             }
-            workerLatch.countDown()
         }
+        workerNum
     }
 
     private def printWorkers(): Unit = {
@@ -95,15 +97,20 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
         private val SERVER_PATH = Paths.get(("src/main/scala/master/output"))
 
         override def registerWorker(req: RegisterRequest) = {
-            var registerSuccess = true
+            var workerNum = -1
             if (workers.length < workerCount) {
-                addWorker(req.address)
-            }
-            else {
-                registerSuccess = false
+                workerNum = addWorker(req.address)
+                workerLatch.countDown()
             }
             workerLatch.await()
-            val reply = RegisterResponse(success = registerSuccess)
+            val reply = RegisterResponse(workerNum = workerNum)
+            Future.successful(reply)
+        }
+
+        
+        override def mergeDone(req: DoneRequest) = {
+            doneWorker(req.address, req.pivot.get)
+            val reply = DoneResponse(ok = true)
             Future.successful(reply)
         }
 
@@ -112,21 +119,23 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
           * functionality mainly done by setPivots in MasterJob.scala
           * - wait for all workers request by CountDownLatch 
           */
+
+        /** getPartitionInfo
+          * - wait for all workers to send partition info by using CountDownLatch
+          * - get all the information from lists and filter each worker Address from other worker's list -> call user defined function from MasterJob
+          * - redistribute file names to according worker address -> in form of List[(WorkerAddress, List[FileName])]
+          */
+
         override def getWorkerPivots(responseObserver: StreamObserver[PivotResponse]): StreamObserver[PivotRequest] = {
             new StreamObserver[PivotRequest]() {
                 var writer: OutputStream = null
                 var status: Status = Status.IN_PROGRESS
+                var sampleFileName = null
 
                 override def onNext(req: PivotRequest): Unit = {
-                    req.info match {
-                        case PivotRequest.Info.Metadata(metadata) => {
-                            writer = getFilePath(req)
-                        }
-                        case PivotRequest.Info.File(file) => {
-                            writeFile(writer, req.info.file.get.content.toString("UTF-8"))
-                        }
-                        case PivotRequest.Info.Empty => {}
-                    }
+                    writer = getFilePath(req)   
+
+                    writeFile(writer, req.file.get.content.toString("UTF-8"))
                 }    
 
 
@@ -140,28 +149,16 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                     if (Status.IN_PROGRESS.equals(status)) {
                         status = Status.SUCCESS
                     }
-                    val reply = PivotResponse(status = status, worker = workerPivots)
+                    val reply = PivotResponse(status = status)
+
                     responseObserver.onNext(reply)
                     responseObserver.onCompleted()
                 }
             }
         }
 
-        /** getPartitionInfo
-          * - wait for all workers to send partition info by using CountDownLatch
-          * - get all the information from lists and filter each worker Address from other worker's list -> call user defined function from MasterJob
-          * - redistribute file names to according worker address -> in form of List[(WorkerAddress, List[FileName])]
-          */
-
-        
-        override def mergeDone(req: DoneRequest) = {
-            doneWorker(req.address, req.pivot.get)
-            val reply = DoneResponse(ok = true)
-            Future.successful(reply)
-        }
-
         private def getFilePath(req: PivotRequest): OutputStream = {
-            var fileName = req.info.metadata.get.name + "." + req.info.metadata.get.fileType
+            var fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
             Files.newOutputStream(SERVER_PATH.resolve(fileName), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
         }
 

@@ -5,16 +5,19 @@ import java.util.logging.{Level, Logger}
 
 import io.grpc.{StatusRuntimeException, ManagedChannelBuilder, ManagedChannel}
 
-import cs332.protos.sorting.SorterGrpc.SorterBlockingStub
+import cs332.protos.sorting.SorterGrpc._
 import cs332.protos.sorting._
 import cs332.common.Util.getIPaddress
-import java.io.File
+import java.io.{File, InputStream}
+import io.grpc.stub.StreamObserver
+import java.nio.file.{Files, Paths}
+import com.google.protobuf.ByteString
 
 object Worker {
     def apply(host: String, port: Int): Worker = {
         val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build
         val blockingStub = SorterGrpc.blockingStub(channel)
-        val newStub = SorterGrpc.newStub(channel)
+        val newStub = SorterGrpc.stub(channel)
         new Worker(channel, blockingStub, newStub)
     }
 
@@ -46,9 +49,9 @@ object Worker {
 
                 }
                 else {
-                    client.externalMergeSort(inputFileDirectory)
+                    // client.externalMergeSort(inputFileDirectory)
                     //client.sample()
-                    
+                    client.sendFile()
                     client.mergeDone()
                 }
                 
@@ -80,6 +83,7 @@ class Worker private(
     private var workerPivots: List[Worker] = null 
     private var partitionRecord: List[(WorkerAddress, List[String])] = null 
     private var partitionInfo: List[(WorkerAddress, List[String])] = null 
+    private var workerNum = -1
 
     def shutdown(): Unit = {
         channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
@@ -89,13 +93,16 @@ class Worker private(
         val request = RegisterRequest(address = myAddress)
         try {
             val response = blockingStub.registerWorker(request)
-            if (response.success) {
-                logger.info("Registration Success")
+            var registerSuccess = false
+            if (response.workerNum != -1) {
+                workerNum = response.workerNum
+                logger.info("Registration Success as Worker " + workerNum)
+                registerSuccess = true
             }
             else {
                 logger.info("Registration Failed")
             }
-            response.success
+            registerSuccess
         } 
         catch {
             case e: StatusRuntimeException =>
@@ -118,32 +125,49 @@ class Worker private(
       *  - saves sample in Array of samples 
       * - call user sampling function in WorkerJob.scala
       */
-    def sampling(): Unit = {
-        StreamObserver[PivotRequest] streamObserver = newStub.getWorkerPivots(new FileUploadObserver())
-        
-        Path path = Paths.get()
-
-        Metadata metadata = Metadata(address = myAddress, name = "sample", fileType = ".1")
-        val metaRequest = PivotRequest(metadata = metadata)
-
-        streamObserver.onNext(metadata)
-
-        InputStream inputStream = Files.newInputStream(path)
-        var bytes = Array.ofDim[Byte](4096)
-        var size: Int = 0
-        while (size = inputStream.read(bytes) > 0){
-            val file = File()
-            val fileRequest = PivotRequest()
-            streamObserver.onNext(request)
-        }
-    }
 
     /* "master-worker" function
      * functionality: send request to master with samples and get pivot and address information of all workers
      * - send request with samples array and worker address
      * - get list of pivot range and address of other workers -> saved in workerPivots
      */
-    def getWorkerPivots() = ???
+
+
+    def sendFile(): Unit = {
+        logger.info("Will try to send file "  + " ...")
+        val streamObserver: StreamObserver[PivotRequest] = newStub.getWorkerPivots(
+            new StreamObserver[PivotResponse] {
+                override def onNext(response: PivotResponse): Unit =  {
+                    System.out.println(
+                            "File upload status :: " + response.status
+                    )
+                }
+
+                override def onError(throwaable: Throwable): Unit = {}
+
+                override def onCompleted(): Unit = {}
+            })  
+        
+        val path = Paths.get("src/main/scala/worker/input/sample/partition0")
+
+
+        val metadata = Metadata(fileName = "sample", fileType = workerNum.toString)
+
+        val inputStream: InputStream = Files.newInputStream(path)
+        var bytes = Array.ofDim[Byte](2000000)
+        var size: Int = 0
+        size = inputStream.read(bytes)
+        while (size > 0){
+            val content = ByteString.copyFrom(bytes, 0 , size)
+            val file = FileMessage(content = content)
+            val fileRequest = PivotRequest(metadata = Option(metadata), file = Option(file))
+            streamObserver.onNext(fileRequest)
+            size = inputStream.read(bytes)
+        }
+        
+        inputStream.close()
+        streamObserver.onCompleted()
+    }
 
     /** "worker main" function 
       * functionality: read pivot range from list workerPivots
