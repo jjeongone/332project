@@ -39,7 +39,7 @@ message RegisterRequest {
 }
 
 message RegisterResponse {
-  int32 workerNum = 1;
+  int32 workerOrder = 1;
 }
 
 message PivotRequest {

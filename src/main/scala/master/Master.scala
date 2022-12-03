@@ -67,15 +67,15 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     }
 
     private def addWorker(address: String): Int = {
-        var workerNum = -1
+        var workerOrder = -1
         this.synchronized{
-            workerNum = workers.length
+            workerOrder = workers.length
             workers = workers.appended(address)
             if (workers.length == workerCount) {
                 printWorkers()
             }
         }
-        workerNum
+        workerOrder
     }
 
     private def printWorkers(): Unit = {
@@ -97,13 +97,13 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
         private val SERVER_PATH = Paths.get(("src/main/scala/master/output"))
 
         override def registerWorker(req: RegisterRequest) = {
-            var workerNum = -1
+            var workerOrder = -1
             if (workers.length < workerCount) {
-                workerNum = addWorker(req.address)
+                workerOrder = addWorker(req.address)
                 workerLatch.countDown()
             }
             workerLatch.await()
-            val reply = RegisterResponse(workerNum = workerNum)
+            val reply = RegisterResponse(workerOrder = workerOrder)
             Future.successful(reply)
         }
 

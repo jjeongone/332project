@@ -1,8 +1,10 @@
 package cs332.common
 
 import java.net.{DatagramSocket, InetAddress}
+import java.nio.file.{Files, Paths}
 
 object Util {
+    val currentDirectory: String = Paths.get(".").toAbsolutePath.toString.dropRight(1)
     def getIPaddress: String = {
         val socket = new DatagramSocket 
         try {

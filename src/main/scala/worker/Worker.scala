@@ -7,7 +7,8 @@ import io.grpc.{StatusRuntimeException, ManagedChannelBuilder, ManagedChannel}
 
 import cs332.protos.sorting.SorterGrpc._
 import cs332.protos.sorting._
-import cs332.common.Util.getIPaddress
+import cs332.common.Util.{getIPaddress, currentDirectory}
+import cs332.worker.WorkerJob._
 import java.io.{File, InputStream}
 import io.grpc.stub.StreamObserver
 import java.nio.file.{Files, Paths}
@@ -49,9 +50,9 @@ object Worker {
 
                 }
                 else {
-                    // client.externalMergeSort(inputFileDirectory)
-                    //client.sample()
-                    client.sendFile()
+                    // client.sample()
+                    client.externalSort(inputFileDirectory)
+                    // client.sendFile()
                     client.mergeDone()
                 }
                 
@@ -74,6 +75,8 @@ class Worker private(
 
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
     private val myAddress: WorkerAddress = getIPaddress
+    private var workerOrder:Int = -1
+
     private var min: String = "0"
     private var max: String = "1"
     private var sortedFileDirectory: FileAddress = null
@@ -83,7 +86,6 @@ class Worker private(
     private var workerPivots: List[Worker] = null 
     private var partitionRecord: List[(WorkerAddress, List[String])] = null 
     private var partitionInfo: List[(WorkerAddress, List[String])] = null 
-    private var workerNum = -1
 
     def shutdown(): Unit = {
         channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
@@ -94,9 +96,9 @@ class Worker private(
         try {
             val response = blockingStub.registerWorker(request)
             var registerSuccess = false
-            if (response.workerNum != -1) {
-                workerNum = response.workerNum
-                logger.info("Registration Success as Worker " + workerNum)
+            if (response.workerOrder != -1) {
+                workerOrder = response.workerOrder
+                logger.info("Registration Success as Worker " + workerOrder)
                 registerSuccess = true
             }
             else {
@@ -110,14 +112,27 @@ class Worker private(
             false
         }
     }
-
-    /** "worker main" function 
-      * Given list of address, external sort function uses adddresses to read file and sort those files.
-      * Sorted temporary files would be placed in user defined path or in same path with different name.
-      * - call user function "externalMergeSort" in WorkerJob.scala
-      * - save output file path in sortedFileDirectory
-      */
-    def externalMergeSort(inputFileDirectory: Array[FileAddress]): Unit = ???
+    
+    def getFilesFromDirectories(inputFileDirectory: Array[FileAddress]): List[File] = {
+        var inputFiles = List[File]()
+        for (address <- inputFileDirectory) {
+            val d = new File(currentDirectory + address)
+            
+            if (d.exists && d.isDirectory) {
+                val tmpFiles = d.listFiles.filter(_.isFile).toList
+                inputFiles = inputFiles ::: tmpFiles
+            } else {
+                logger.info("Input File directories do not exist or are not directories") 
+            }
+        }
+                logger.info("inputFiles: "+ inputFiles) 
+        inputFiles
+    }
+    
+    def externalSort(inputFileDirectory: Array[FileAddress]): Unit = {
+        val inputFiles = getFilesFromDirectories(inputFileDirectory)
+        WorkerJob.externalMergeSort(inputFiles)
+    }
 
     /** "worker main" function 
       * functionality: sample function extracts some data from sorted file and gives output as File format
@@ -138,7 +153,7 @@ class Worker private(
         val streamObserver: StreamObserver[PivotRequest] = newStub.getWorkerPivots(
             new StreamObserver[PivotResponse] {
                 override def onNext(response: PivotResponse): Unit =  {
-                    System.out.println(
+                    logger.info(
                             "File upload status :: " + response.status
                     )
                 }
@@ -151,7 +166,7 @@ class Worker private(
         val path = Paths.get("src/main/scala/worker/input/sample/partition0")
 
 
-        val metadata = Metadata(fileName = "sample", fileType = workerNum.toString)
+        val metadata = Metadata(fileName = "sample", fileType = workerOrder.toString)
 
         val inputStream: InputStream = Files.newInputStream(path)
         var bytes = Array.ofDim[Byte](2000000)
