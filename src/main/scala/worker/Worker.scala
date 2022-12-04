@@ -50,9 +50,9 @@ object Worker {
 
                 }
                 else {
-                    // client.sample()
                     client.externalSort(inputFileDirectory)
-                    // client.sendFile()
+                    client.sample()
+                    client.sendSample()
                     client.mergeDone()
                 }
                 
@@ -112,7 +112,7 @@ class Worker private(
             false
         }
     }
-    
+
     def getFilesFromDirectories(inputFileDirectory: Array[FileAddress]): List[File] = {
         var inputFiles = List[File]()
         for (address <- inputFileDirectory) {
@@ -125,7 +125,7 @@ class Worker private(
                 logger.info("Input File directories do not exist or are not directories") 
             }
         }
-                logger.info("inputFiles: "+ inputFiles) 
+                // logger.info("inputFiles: "+ inputFiles) 
         inputFiles
     }
     
@@ -134,12 +134,9 @@ class Worker private(
         WorkerJob.externalMergeSort(inputFiles)
     }
 
-    /** "worker main" function 
-      * functionality: sample function extracts some data from sorted file and gives output as File format
-      *  - extracts samples from sorted file stored
-      *  - saves sample in Array of samples 
-      * - call user sampling function in WorkerJob.scala
-      */
+    def sample(): Unit = {
+        WorkerJob.sampling()
+    }
 
     /* "master-worker" function
      * functionality: send request to master with samples and get pivot and address information of all workers
@@ -148,7 +145,7 @@ class Worker private(
      */
 
 
-    def sendFile(): Unit = {
+    def sendSample(): Unit = {
         logger.info("Will try to send file "  + " ...")
         val streamObserver: StreamObserver[PivotRequest] = newStub.getWorkerPivots(
             new StreamObserver[PivotResponse] {
@@ -163,10 +160,10 @@ class Worker private(
                 override def onCompleted(): Unit = {}
             })  
         
-        val path = Paths.get("src/main/scala/worker/input/sample/partition0")
+        val path = Paths.get(currentDirectory + WorkerJob.sampleFile)
 
 
-        val metadata = Metadata(fileName = "sample", fileType = workerOrder.toString)
+        val metadata = Metadata(fileName = WorkerJob.sampleFile, fileType = workerOrder.toString)
 
         val inputStream: InputStream = Files.newInputStream(path)
         var bytes = Array.ofDim[Byte](2000000)

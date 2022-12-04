@@ -10,7 +10,7 @@ import io.grpc.stub.StreamObserver
 import java.nio.file.{Files, Paths}
 
 import cs332.protos.sorting._
-import cs332.common.Util.getIPaddress
+import cs332.common.Util.{getIPaddress, currentDirectory, makeSubdirectory}
 import java.nio.file.StandardOpenOption
 import java.io.IOException
 
@@ -38,6 +38,8 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private var workers: List[String] = List()
     private var workerDone: List[(String, Pivot)] = List()
     private var workerPivots: List[Worker] = List()
+    private val samplePath = "samples"
+    private val SERVER_PATH = Paths.get(makeSubdirectory(currentDirectory, samplePath))
 
     private def start(): Unit = {
         server = ServerBuilder.forPort(Master.port).addService(SorterGrpc.bindService(new SorterImpl, executionContext)).build.start
@@ -94,8 +96,6 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     }
 
     private class SorterImpl extends SorterGrpc.Sorter{
-        private val SERVER_PATH = Paths.get(("src/main/scala/master/output"))
-
         override def registerWorker(req: RegisterRequest) = {
             var workerOrder = -1
             if (workers.length < workerCount) {
@@ -107,7 +107,6 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             Future.successful(reply)
         }
 
-        
         override def mergeDone(req: DoneRequest) = {
             doneWorker(req.address, req.pivot.get)
             val reply = DoneResponse(ok = true)
@@ -132,12 +131,13 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 var status: Status = Status.IN_PROGRESS
                 var sampleFileName = null
 
+
                 override def onNext(req: PivotRequest): Unit = {
+                    
                     writer = getFilePath(req)   
 
                     writeFile(writer, req.file.get.content.toString("UTF-8"))
                 }    
-
 
                 override def onError(throwable: Throwable): Unit = {
                     status = Status.FAILED
