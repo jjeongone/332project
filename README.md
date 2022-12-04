@@ -187,7 +187,7 @@ Ubuntu `22.04`, Java `1.8.0` (openjdk-8), scala `2.13.8`
  - worker과 master 각 모듈에 해당하는 개별 dockerfile을 생성해서 commit (`testing-environment`)
  - command aliases 관련한 issue 발견 후 확인 중 (`testing-environment`)
  - 여러 개의 file을 기다렸다 처리하는 비동기 처리 구현 완료 (`file-transfer`)
- - partitionByPivot 함수의 시간이 오래 걸리는 문제를 해결했으나, return value가 예상과 다르게 나오는 issue 발견 및 확인 중 (`worker-functions`)
+ - partitionByPivot 함수의 시간이 오래 걸리는 문제의 원인을 확인하였음. 또한 return value가 예상과 다르게 나오는 issue 발견 및 확인 중 (`worker-functions`)
  
  ### Goal of the week
  - 구현 완료하기
