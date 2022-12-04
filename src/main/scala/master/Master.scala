@@ -3,7 +3,7 @@ package cs332.master
 import java.util.logging.Logger
 import io.grpc.{Server, ServerBuilder}
 
-
+import java.util.concurrent.CountDownLatch
 import scala.concurrent.{ExecutionContext, Future}
 import java.io.OutputStream
 import io.grpc.stub.StreamObserver
@@ -29,6 +29,9 @@ object Master {
 
 class Master(executionContext: ExecutionContext) {self => 
     private [this] var server: Server = null
+    private var tmpSharedSource = List[String]()
+    private val workerCount = 2
+    private val getWorkerPivotsLatch: CountDownLatch = new CountDownLatch(workerCount)
     private val SERVER_PATH = Paths.get("src/main/scala/master/sample")
     private def start(): Unit = {
         server = ServerBuilder.forPort(Master.port).addService(SorterGrpc.bindService(new SorterImpl, executionContext)).build.start
@@ -49,6 +52,13 @@ class Master(executionContext: ExecutionContext) {self =>
     private def blockUntilShutdown(): Unit = {
         if (server != null) {
             server.awaitTermination()
+        }
+    }
+
+    private def modifyTmpSharedSource(): Unit = {
+        this.synchronized{
+            tmpSharedSource = tmpSharedSource.appended("OK")
+            getWorkerPivotsLatch.countDown()
         }
     }
 
@@ -81,6 +91,13 @@ class Master(executionContext: ExecutionContext) {self =>
 
                 override def onCompleted(): Unit = {
                     closeFile(writer)
+
+                    modifyTmpSharedSource() // To be replaced by the sampling method
+                    Master.logger.info("Waiting for others...")
+                    getWorkerPivotsLatch.await()
+                    
+                    System.out.println(tmpSharedSource)
+
                     if (Status.IN_PROGRESS.equals(status)) {
                         status = Status.SUCCESS
                     }
@@ -97,7 +114,7 @@ class Master(executionContext: ExecutionContext) {self =>
             Files.newOutputStream(SERVER_PATH.resolve(fileName), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
         }
 
-        private def writeFile(writer: OutputStream, content: String) = {
+        private def writeFile(writer: OutputStream, content: String) = { // Check if race condition occurred itself
             writer.write(content.getBytes())
             writer.flush()
         }
