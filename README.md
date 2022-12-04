@@ -194,8 +194,9 @@ Ubuntu `22.04`, Java `1.8.0` (openjdk-8), scala `2.13.8`
  - 모든 기능 통합 후, 전체 process 디버깅 및 테스트
  
  ### Goal of the week for individual member
- |member|goal|
- |:---:\---|
- |김민결| - partitionByPivot 함수 수정 |
- |이희우| - 함수 합치기 마무리 |
- |최정원| - command aliases 확인 <br/> - gRPC worker-worker 통신 구현 |
+ 
+|member|goal|
+|:---:|---|
+|김민결|- partitionByPivot 함수 수정|
+|이희우|- 함수 합치기 마무리|
+|최정원|- command aliases 확인 <br/> - gRPC worker-worker 통신 구현|
