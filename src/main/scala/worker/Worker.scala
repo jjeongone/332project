@@ -68,25 +68,16 @@ class Worker private(
     private val blockingStub: SorterBlockingStub,
     private val newStub: SorterStub
 ) {
-    type Pivot = (String, String)
-    type WorkerAddress = String 
     type FileAddress = String
-    type Worker = (WorkerAddress, Pivot)
+    type WorkerAddress = String
 
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
     private val myAddress: WorkerAddress = getIPaddress
     private var workerOrder:Int = -1
+    private var workerPivots: List[cs332.protos.sorting.Worker]= null 
 
-    private var min: String = "0"
-    private var max: String = "1"
-    private var sortedFileDirectory: FileAddress = null
-    private var partitionedFileDirectory: FileAddress = null
-    private var shuffledFileDirectory: FileAddress = null
-    private var samples: List[String] = null 
-    private var workerPivots: List[Worker] = null 
-    private var partitionRecord: List[(WorkerAddress, List[String])] = null 
-    private var partitionInfo: List[(WorkerAddress, List[String])] = null 
-
+    val min = "" 
+    val max = ""
     def shutdown(): Unit = {
         channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
     }
@@ -150,8 +141,12 @@ class Worker private(
         val streamObserver: StreamObserver[PivotRequest] = newStub.getWorkerPivots(
             new StreamObserver[PivotResponse] {
                 override def onNext(response: PivotResponse): Unit =  {
+                    workerPivots = response.workerPivots.toList
                     logger.info(
                             "File upload status :: " + response.status
+                    ) 
+                    logger.info(
+                        "worker pivots " + workerPivots
                     )
                 }
 

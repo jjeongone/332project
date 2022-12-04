@@ -49,6 +49,7 @@ message PivotRequest {
 
 message PivotResponse {
   Status status = 1;
+  repeated Worker workerPivots = 2;
 }
 message DoneRequest {
   string address = 1;
