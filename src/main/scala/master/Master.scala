@@ -7,11 +7,12 @@ import java.util.concurrent.CountDownLatch
 import scala.concurrent.{ExecutionContext, Future}
 import java.io.OutputStream
 import io.grpc.stub.StreamObserver
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Paths, Path}
 import java.io.{File, InputStream}
 import scala.io.Source
 import cs332.protos.sorting._
-import cs332.common.Util.{getIPaddress, currentDirectory, makeSubdirectory}
+import cs332.worker.WorkerJob
+import cs332.common.Util.{getIPaddress, currentDirectory, makeSubdirectory, splitEndpoint, readFilesfromDirectory}
 import java.nio.file.StandardOpenOption
 import java.io.IOException
 
@@ -29,7 +30,7 @@ object Master {
         }
     }
 
-    private val port = 50052
+    private val port = 50059
 }
 
 class Master(executionContext: ExecutionContext, workerCount: Int) {self => 
@@ -41,6 +42,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private var workerDone: List[(String, Pivot)] = List()
     private var workerPivots: List[Worker] = List()
     private val samplesPath = "samples"
+    private val sortedSamples = "sortedSamples"
     private val SERVER_PATH = Paths.get(makeSubdirectory(currentDirectory, samplesPath))
 
     private def start(): Unit = {
@@ -83,7 +85,8 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     }
 
     private def printWorkers(): Unit = {
-        System.out.println(workers.mkString(", "))
+        val workerAddresses = workers.map(worker => splitEndpoint(worker.address)._1)
+        System.out.println(workerAddresses.mkString(", "))
     }
 
     private def doneWorker(address: String, pivot: Pivot): Unit = {
@@ -115,18 +118,6 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             Future.successful(reply)
         }
 
-        
-        /** "master-worker" service
-          * functionality mainly done by setPivots in MasterJob.scala
-          * - wait for all workers request by CountDownLatch 
-          */
-
-        /** getPartitionInfo
-          * - wait for all workers to send partition info by using CountDownLatch
-          * - get all the information from lists and filter each worker Address from other worker's list -> call user defined function from MasterJob
-          * - redistribute file names to according worker address -> in form of List[(WorkerAddress, List[FileName])]
-          */
-
         override def getWorkerPivots(responseObserver: StreamObserver[PivotResponse]): StreamObserver[PivotRequest] = {
             new StreamObserver[PivotRequest]() {
                 var writer: OutputStream = null
@@ -135,8 +126,9 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
 
 
                 override def onNext(req: PivotRequest): Unit = {
-                    
-                    writer = getFilePath(req)   
+                    val fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
+         
+                    writer = getFilePath(SERVER_PATH, fileName)   
 
                     writeFile(writer, req.file.get.content.toString("UTF-8"))
                 }    
@@ -151,12 +143,10 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                     if (Status.IN_PROGRESS.equals(status)) {
                         status = Status.SUCCESS
                     }
-                    // combine all sample files in sample folder to one sample file
-                    // assertion file number same as workerCount
-                    val samplesContent = new File(currentDirectory + samplesPath + "/sample.0")
-                    System.out.println("sampleContent: " + Source.fromFile(samplesContent).getLines().toList)
+                    val sampleFiles = readFilesfromDirectory(samplesPath).filter(file => !(file.toString.contains(sortedSamples)))
+                    WorkerJob.mergeIntoSortedFile(sampleFiles, SERVER_PATH + "/" + sortedSamples)
+                    val samplesContent = new File(SERVER_PATH + "/" + sortedSamples)
                     workerPivots = MasterJob.setPivot(samplesContent, workers)
-                    System.out.println(workerPivots)
                     val reply = PivotResponse(status = status, workerPivots = workerPivots)
 
                     responseObserver.onNext(reply)
@@ -165,9 +155,8 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             }
         }
 
-        private def getFilePath(req: PivotRequest): OutputStream = {
-            var fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
-            Files.newOutputStream(SERVER_PATH.resolve(fileName), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+        private def getFilePath(path: Path, fileName: String): OutputStream = {
+            Files.newOutputStream(path.resolve(fileName), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
         }
 
         private def writeFile(writer: OutputStream, content: String) = {
@@ -183,6 +172,12 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 case e: Exception => e.printStackTrace()
             }
         }
-    }
 
+        /** getPartitionInfo
+          * - wait for all workers to send partition info by using CountDownLatch
+          * - get all the information from lists and filter each worker Address from other worker's list -> call user defined function from MasterJob
+          * - redistribute file names to according worker address -> in form of List[(WorkerAddress, List[FileName])]
+          */
+
+    }
 }

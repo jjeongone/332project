@@ -29,4 +29,24 @@ object Util {
         }
         newPath
     }
+
+    def splitEndpoint(endpoint: String): (String, Int) = {
+        val address = endpoint.split(":").apply(0)
+        val port = endpoint.split(":").apply(1).toInt
+        (address, port)
+    }
+
+    def readFilesfromDirectory(directory: String): List[File] = {
+        var files = List[File]()
+        val dir = new File(currentDirectory + directory)
+
+        if (dir.exists && dir.isDirectory) {
+            val tmp = dir.listFiles.filter(_.isFile).toList
+            files = files ::: tmp
+        } else {
+            logger.info("Input File directories do not exist or are not directories") 
+        }
+
+        files
+    }
 }

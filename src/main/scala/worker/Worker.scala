@@ -5,9 +5,10 @@ import java.util.logging.{Level, Logger}
 
 import io.grpc.{StatusRuntimeException, ManagedChannelBuilder, ManagedChannel}
 
+import java.util.concurrent.CountDownLatch
 import cs332.protos.sorting.SorterGrpc._
 import cs332.protos.sorting._
-import cs332.common.Util.{getIPaddress, currentDirectory}
+import cs332.common.Util.{getIPaddress, currentDirectory, splitEndpoint}
 import cs332.worker.WorkerJob._
 import java.io.{File, InputStream}
 import io.grpc.stub.StreamObserver
@@ -19,7 +20,7 @@ object Worker {
         val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build
         val blockingStub = SorterGrpc.blockingStub(channel)
         val newStub = SorterGrpc.stub(channel)
-        new Worker(channel, blockingStub, newStub)
+        new Worker(channel, blockingStub, newStub, workerPort)
     }
 
 
@@ -38,8 +39,8 @@ object Worker {
             System.out.println("Output File Directory is not ready")
         }
         else {
-            val masterIPAddress = masterEndpoint.get.split(":").apply(0)
-            val masterPort = masterEndpoint.get.split(":").apply(1).toInt
+            val masterIPAddress = splitEndpoint(masterEndpoint.get)._1
+            val masterPort = splitEndpoint(masterEndpoint.get)._2
             
             val client = Worker(masterIPAddress, masterPort)
             
@@ -53,6 +54,7 @@ object Worker {
                     client.externalSort(inputFileDirectory)
                     client.sample()
                     client.sendSample()
+                    client.partitionByPivot()
                     client.mergeDone()
                 }
                 
@@ -61,12 +63,15 @@ object Worker {
             }
         }
     }
+
+    private val workerPort = 50060
 }
 
 class Worker private(
     private val channel: ManagedChannel, 
     private val blockingStub: SorterBlockingStub,
-    private val newStub: SorterStub
+    private val newStub: SorterStub,
+    private val myPort: Int
 ) {
     type FileAddress = String
     type WorkerAddress = String
@@ -75,6 +80,9 @@ class Worker private(
     private val myAddress: WorkerAddress = getIPaddress
     private var workerOrder:Int = -1
     private var workerPivots: List[cs332.protos.sorting.Worker]= null 
+    
+    private val pivotLatch: CountDownLatch = new CountDownLatch(1)
+    
 
     val min = "" 
     val max = ""
@@ -83,7 +91,9 @@ class Worker private(
     }
 
     def register(): Boolean = {
-        val request = RegisterRequest(address = myAddress)
+        val endpoint = myAddress + ":" + myPort
+        // val endpoint = myAddress 
+        val request = RegisterRequest(address = endpoint)
         try {
             val response = blockingStub.registerWorker(request)
             var registerSuccess = false
@@ -116,7 +126,6 @@ class Worker private(
                 logger.info("Input File directories do not exist or are not directories") 
             }
         }
-                // logger.info("inputFiles: "+ inputFiles) 
         inputFiles
     }
     
@@ -129,19 +138,14 @@ class Worker private(
         WorkerJob.sampling()
     }
 
-    /* "master-worker" function
-     * functionality: send request to master with samples and get pivot and address information of all workers
-     * - send request with samples array and worker address
-     * - get list of pivot range and address of other workers -> saved in workerPivots
-     */
-
-
     def sendSample(): Unit = {
         logger.info("Will try to send file "  + " ...")
         val streamObserver: StreamObserver[PivotRequest] = newStub.getWorkerPivots(
             new StreamObserver[PivotResponse] {
                 override def onNext(response: PivotResponse): Unit =  {
                     workerPivots = response.workerPivots.toList
+                    pivotLatch.countDown
+                    assert(workerPivots != null)
                     logger.info(
                             "File upload status :: " + response.status
                     ) 
@@ -152,7 +156,8 @@ class Worker private(
 
                 override def onError(throwaable: Throwable): Unit = {}
 
-                override def onCompleted(): Unit = {}
+                override def onCompleted(): Unit = {
+                }
             })  
         
         val path = Paths.get(currentDirectory + WorkerJob.sampleFile)
@@ -174,7 +179,9 @@ class Worker private(
         
         inputStream.close()
         streamObserver.onCompleted()
+        pivotLatch.await()
     }
+
 
     /** "worker main" function 
       * functionality: read pivot range from list workerPivots
@@ -183,7 +190,33 @@ class Worker private(
       * - record list of partition file name in second place of tuple -> save record in var partitionRecord
       * - move my range partitioned file to shuffledFileDirectory
       */
-    def partitionByPivot() = ???
+    def partitionByPivot() = {
+       
+        // System.out.println("workerPivots:" + workerPivots)
+        val partition = WorkerJob.partitionByPivot(workerPivots, workerOrder)
+
+        // val request = par(address = endpoint)
+        // try {
+        //     val response = blockingStub.registerWorker(request)
+        //     var registerSuccess = false
+        //     if (response.workerOrder != -1) {
+        //         workerOrder = response.workerOrder
+        //         logger.info("Registration Success as Worker " + workerOrder)
+        //         registerSuccess = true
+        //     }
+        //     else {
+        //         logger.info("Registration Failed")
+        //     }
+        //     registerSuccess
+        // } 
+        // catch {
+        //     case e: StatusRuntimeException =>
+        //     logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
+        //     false
+        // }
+        
+         // assertion all pivots in workerPivots are not ""
+    }
 
     /** "master-worker" function 
       * functionality: get information of my partitioned file distribution in other worker
@@ -198,7 +231,7 @@ class Worker private(
       * - if shuffling done start mergeIntoSortedFile
       * - save shuffled file in shuffledFileDirectory
       */
-    def shuffling() = ???
+    def shuffle() = ???
  
     /** "worker main" function
       * functionality: merge all received partitioned file in 
