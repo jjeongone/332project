@@ -31,8 +31,8 @@ object Partitioning {
 
     def unionMap(map0: Map[Address, List[File]], map1: Map[Address, List[File]]): Map[Address, List[File]] = {
       map0.foldLeft(map1)((acc, keyval) => acc.get(keyval._1) match {
-        case None => acc
-        case Some(v) => acc ++ Map(keyval._1 -> (keyval._2 ::: v))
+        case None => acc ++ Map(keyval._1 -> keyval._2)
+        case Some(v) => acc ++ Map(keyval._1 -> (keyval._2.toSet ++ v.toSet).toList)
       })
     }
 
