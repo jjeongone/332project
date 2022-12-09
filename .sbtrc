@@ -1,0 +1,2 @@
+alias master=runMain cs332.master.Master
+alias worker=runMain cs332.worker.Worker
