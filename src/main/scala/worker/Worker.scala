@@ -22,11 +22,11 @@ object Worker {
     }
 
     def main(args: Array[String]): Unit = {
-        val client = Worker("localhost", 50051)
+        val client = Worker("localhost", 50054)
         try {
             val user = args.headOption.getOrElse("world")
             client.greet(user)
-            client.sendFile()
+            client.sendMultipleFiles()
         } finally {
         client.shutdown()
         }
@@ -90,6 +90,47 @@ class Worker private(
         }
         
         inputStream.close()
+        streamObserver.onCompleted()
+    }
+
+    def sendMultipleFiles(): Unit = {
+        logger.info("Will try to send multiple files "  + " ...")
+        val streamObserver: StreamObserver[PivotRequest] = newStub.getWorkerPivots(
+            new StreamObserver[PivotResponse] {
+                override def onNext(response: PivotResponse): Unit =  {
+                    System.out.println(
+                        "File upload status :: " + response.status
+                    )
+                }
+
+                override def onError(throwaable: Throwable): Unit = {}
+
+                override def onCompleted(): Unit = {}
+            })
+
+        val pathStrings = List("src/main/scala/worker/input/sample/sample0.1", "src/main/scala/worker/input/sample/sample1.1", "src/main/scala/worker/input/sample/sample2.1")
+
+        pathStrings.foldLeft(())((acc, pathString) => {
+            val path = Paths.get(pathString)
+
+            val fileName = pathString.split('/').last
+            val metadata = Metadata(fileName = fileName.split('.').head, fileType = fileName.split('.').last)
+
+            val inputStream: InputStream = Files.newInputStream(path)
+            var bytes = Array.ofDim[Byte](2000000)
+
+            var size: Int = 0
+            size = inputStream.read(bytes)
+            while (size > 0){
+                val content = ByteString.copyFrom(bytes, 0 , size)
+                val file = FileMessage(content = content)
+                val fileRequest = PivotRequest(metadata = Option(metadata), file = Option(file))
+                streamObserver.onNext(fileRequest)
+                size = inputStream.read(bytes)
+            }
+            inputStream.close()
+        })
+
         streamObserver.onCompleted()
     }
 

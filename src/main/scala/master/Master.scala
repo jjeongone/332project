@@ -24,7 +24,7 @@ object Master {
         server.blockUntilShutdown()
     }
 
-    private val port = 50051
+    private val port = 50054
 }
 
 class Master(executionContext: ExecutionContext) {self => 
@@ -67,7 +67,6 @@ class Master(executionContext: ExecutionContext) {self =>
             val reply = HelloReply(message = "Hello " + req.name)
             Future.successful(reply)
         }
-
         
         override def getWorkerPivots(responseObserver: StreamObserver[PivotResponse]): StreamObserver[PivotRequest] = {
             new StreamObserver[PivotRequest]() {
@@ -81,8 +80,7 @@ class Master(executionContext: ExecutionContext) {self =>
                     }
 
                     writeFile(writer, req.file.get.content.toString("UTF-8"))
-                }    
-
+                }
 
                 override def onError(throwable: Throwable): Unit = {
                     status = Status.FAILED
