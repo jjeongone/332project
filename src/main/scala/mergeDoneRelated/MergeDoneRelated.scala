@@ -1,23 +1,8 @@
 package mergeDoneRelated
 
 import partitioning.Partitioning._
-import java.io.File
-import java.util.Scanner
 
 object MergeDoneRelated {
-  // Assume that the file is sorted
-  def extractMinMaxKey(file: File): Pivot = {
-    val scanner = new Scanner(file)
-    def extractMinMaxKeyAux(preKey: String): String = {
-      if (scanner.hasNextLine()) extractMinMaxKeyAux(scanner.nextLine())
-      else preKey
-    }
-    assert(scanner.hasNextLine())
-    val minKey = scanner.nextLine()
-    val maxKey = extractMinMaxKeyAux(minKey)
-    (minKey, maxKey)
-  }
-
   // Assume that always Pivot._1 <= Pivot._2
   def validationWorkerOrdering(workerToMinMaxKey: Map[Worker, Pivot], workers: List[Worker]): Boolean = {
     def validateMinMaxKeyDependency(prevMinMaxKeyOpt: Option[Pivot], currMinMaxKey: Pivot): Boolean = prevMinMaxKeyOpt match {

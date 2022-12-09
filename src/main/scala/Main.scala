@@ -1,22 +1,21 @@
-import java.io.File
-import sortingmerging.SortingMerging._
+import mergeDoneRelated.MergeDoneRelated._
 import partitioning.Partitioning._
 
 object Main extends App {
   println("Hello, World!")
-//  sorting example
-//  val sortingTestFilePath = "C:\\Users\\user\\Desktop\\2022-2\\SD\\Project\\332project\\src\\main\\scala\\test\\sortingmerging\\sorting\\input\\"
-//  val sortingTestFiles = List(new File(sortingTestFilePath + "test0"), new File(sortingTestFilePath + "test1"), new File(sortingTestFilePath + "test2"))
-//  println(externalMergeSort(sortingTestFiles))
-//
-////  merging example
-//  val mergingTestFilePath = "C:\\Users\\user\\Desktop\\2022-2\\SD\\Project\\332project\\src\\main\\scala\\test\\sortingmerging\\merging\\input\\"
-//  val mergingTestFiles = List(new File(mergingTestFilePath + "0"), new File(mergingTestFilePath + "1"), new File(mergingTestFilePath + "2"))
-//  println(mergeIntoSortedFile(mergingTestFiles))
 
-//  partitioning example
-  val workers = List(("hi", (" +cYsra!|\\", "98Z\"lo?kCN")), ("hello", ("<*dUGxo|~A", "fqPP|6z3'/")), ("bye", ("lR+Oub\\gZ/", "}=DW;~<}P+")))
-  val partitioningTestFilePath = "C:\\Users\\user\\Desktop\\2022-2\\SD\\Project\\332project\\src\\main\\scala\\test\\partitioning\\input\\"
-  val partitioningTestFile = new File(partitioningTestFilePath + "test")
-  println(partitionByPivot(partitioningTestFile, workers))
+  val address0 = "hello"
+  val address1 = "hi"
+  val address2 = "bye"
+
+  val worker0 = (address0, ("a", "b"))
+  val worker1 = (address1, ("c", "d"))
+  val worker2 = (address2, ("e", "f"))
+
+  val partition0 = Map(address0 -> 11, address2 -> 3)
+  val partition1 = Map(address0 -> 0, address1 -> 1, address2 -> 4)
+  val partition2 = Map(address0 -> 2, address2 -> 31)
+
+  val totalPartition = Map(address0 -> partition0, address1 -> partition1, address2 -> partition2)
+  println(totalPartitionInfo(totalPartition))
 }
