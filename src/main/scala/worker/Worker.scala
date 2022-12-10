@@ -141,12 +141,12 @@ class Worker private(
     
     def externalSort(inputFileDirectory: Array[FileAddress]): Unit = {
         val inputFiles = getFilesFromDirectories(inputFileDirectory)
-        WorkerJob.externalMergeSort(inputFiles)
+        WorkerJob.externalMergeSort(workerDirectory, workerOrder, inputFiles)
         logger.info("EXTERNAL MERGE SORT : done") 
     }
 
     def sample(): Unit = {
-        WorkerJob.sampling()
+        WorkerJob.sampling(workerDirectory, workerOrder)
         logger.info("SAMPLE : sampline is done") 
     }
 
@@ -169,7 +169,7 @@ class Worker private(
                 }
             })  
         
-        val path = Paths.get(currentDirectory + WorkerJob.sampleFile)
+        val path = Paths.get(workerDirectory + WorkerJob.sampleFile + "." + workerOrder)
 
 
         val metadata = Metadata(fileName = WorkerJob.sampleFile, fileType = workerOrder.toString)

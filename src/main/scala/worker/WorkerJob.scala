@@ -24,8 +24,8 @@ object WorkerJob{
 
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
 
-    val outputPath = makeSubdirectory(currentDirectory, externalSortPath)
-    val tmpfilesPath = makeSubdirectory(currentDirectory, tmpPath4External)
+    val outputPath: String = null 
+    val tmpfilesPath: String = null 
 
     def cmp: Comparator[String] = new Comparator[String] {
         override def compare(s1:String, s2:String): Int = {
@@ -40,7 +40,8 @@ object WorkerJob{
         ExternalSort.mergeSortedFiles(files.asJava, testOutput, cmp)
     }
 
-    def externalMergeSort(files: List[File]): Unit = {
+    def externalMergeSort(directory: String, workerOrder: String, files: List[File]): Unit = {
+        tmpfilesPath = makeSubdirectory(directory, tmpPath4External + workerOrder)
         val sortedFiles = files.foldLeft(List[File]())((acc, file) => {
         val batchFileList = ExternalSort.sortInBatch(new BufferedReader(new FileReader(file)), 100, cmp,
             ExternalSort.DEFAULTMAXTEMPFILES, ExternalSort.estimateAvailableMemory(), Charset.defaultCharset(),
@@ -49,12 +50,14 @@ object WorkerJob{
         ExternalSort.mergeSortedFiles(batchFileList, outputFile, cmp)
         outputFile :: acc
         })
-        mergeIntoSortedFile(sortedFiles, outputPath + "/" + externalSortFile)
+        outputPath = makeSubdirectory(directory, externalSortPath) + "/"
+        mergeIntoSortedFile(sortedFiles, outputPath  + externalSortFile + "." + workerOrder)
     }
     
-    def sampling(): Unit = {
-        val lines = Source.fromFile(new File(currentDirectory + externalSortPath +"/" +  externalSortFile)).getLines().toList
-        val sampleFilename = new File(currentDirectory + sampleFile)
+    def sampling(directory: String, fileType: String): Unit = {
+        assert(outputPath != null)
+        val lines = Source.fromFile(new File(directory + externalSortPath +"/" +  externalSortFile + "." + workerOrder)).getLines().toList
+        val sampleFilename = new File(directory + sampleFile + "." + workerOrder)
         val bw = new BufferedWriter(new FileWriter(sampleFilename))
         val samples = lines.foldLeft((List[Key](), 0))((acc, line) => {
         if (acc._2 % samplingFactor == 0) (acc._1 :+ line.slice(0, 10), acc._2 + 1)
