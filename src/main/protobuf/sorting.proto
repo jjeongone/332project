@@ -41,8 +41,7 @@ enum Role {
 service Sorter {
   rpc registerWorker (RegisterRequest) returns (RegisterResponse) {}
   rpc getWorkerPivots (stream PivotRequest) returns (PivotResponse) {}
-  rpc getPartitionInfo (PartitionRequest) returns (PartitionResponse) {}
-  rpc workerFileServerManagement (FileServerRequest) returns (FileServerResponse) {}
+ // rpc workerFileServerManagement (FileServerRequest) returns (FileServerResponse) {}
   rpc mergeDone (DoneRequest) returns (DoneResponse) {}
 }
 
@@ -65,7 +64,8 @@ message PivotResponse {
 }
 
 message PartitionRequest {
-  repeated PartitionInfo partitionInfo = 1;
+  string address = 1;
+  repeated PartitionInfo partitionInfo = 2;
 }
 
 message PartitionResponse {

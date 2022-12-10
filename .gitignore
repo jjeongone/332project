@@ -19,3 +19,4 @@ external*
 sample*
 worker/*
 master/*
+mergedOutput

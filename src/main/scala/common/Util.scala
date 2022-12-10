@@ -8,7 +8,7 @@ import java.io.File
 
 object Util {
     private[this] val logger = Logger.getLogger("Util")
-    val currentDirectory: String = Paths.get(".").toAbsolutePath.toString.dropRight(1)
+    val currentDirectory: String = Paths.get(".").toAbsolutePath.toString.dropRight(1)+ "/"
     def getIPaddress: String = {
         val socket = new DatagramSocket 
         try {
@@ -39,13 +39,13 @@ object Util {
 
     def readFilesfromDirectory(directory: String): List[File] = {
         var files = List[File]()
-        val dir = new File(currentDirectory + directory)
+        val dir = new File(directory)
 
         if (dir.exists && dir.isDirectory) {
             val tmp = dir.listFiles.filter(_.isFile).toList
             files = files ::: tmp
         } else {
-            logger.info("Input File directories do not exist or are not directories") 
+            logger.info(directory + " do not exist or are not directories") 
         }
 
         files

@@ -148,6 +148,15 @@ object WorkerJob{
         executePartitionByPivotAux(Map[Address, List[File]](), initializeNamingIndex)
     }
     
-
-    def merge() = ???
+    def extractMinMaxKey(file: File): (String, String) = {
+        val scanner = new Scanner(file)
+        def extractMinMaxKeyAux(preKey: String): String = {
+            if (scanner.hasNextLine()) extractMinMaxKeyAux(scanner.nextLine().slice(0, 10))
+            else preKey
+        }
+        assert(scanner.hasNextLine())
+        val minKey = scanner.nextLine().slice(0, 10)
+        val maxKey = extractMinMaxKeyAux(minKey)
+        (minKey, maxKey)
+    }
 }

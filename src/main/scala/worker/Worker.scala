@@ -56,6 +56,7 @@ object Worker {
                     client.sample()
                     client.sendSample()
                     client.partitionByPivot()
+                    client.mergeIntoSortedFile(outputFileDirectory.head)
                     client.mergeDone()
                 }
                 
@@ -80,7 +81,9 @@ class Worker private(
     private val workerDirectory = Util.makeSubdirectory(currentDirectory, "worker") + "/"
 
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
+    // private val fileHandler = Util.createHandler(workerDirectory, "worker.log")
     private val myAddress: WorkerAddress = getIPaddress
+    private val myEndpoint: String = myAddress + ":" + myPort.toInt
     private var workerOrder:Int = -1
     private var workerPivots: List[cs332.protos.sorting.Worker]= null 
     
@@ -88,15 +91,16 @@ class Worker private(
     private var shuffleCandidate: List[String] = null
     private val shufflePath: String = "shuffled"
     private val mergedOutput: String = "mergedOutput"
-    val min = "" 
-    val max = ""
+    private var partition: Map[String, List[File]] = null
+    private var min = "" 
+    private var max = ""
     def shutdown(): Unit = {
         channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
     }
 
     def register(): Boolean = {
         
-        logger.addHandler(Util.createHandler(workerDirectory, "worker.log"))
+        // logger.addHandler(fileHandler)
         val endpoint = myAddress + ":" + myPort
         // val endpoint = myAddress 
         val request = RegisterRequest(address = endpoint)
@@ -188,65 +192,31 @@ class Worker private(
         pivotLatch.await()
     }
 
-
-    /** "worker main" function 
-      * functionality: read pivot range from list workerPivots
-      * - partition files in sortedOutputFileDirectory by pivot range in workerPivots
-      * - save partitioned file in user defined path, partitionedFileDirectory
-      * - record list of partition file name in second place of tuple -> save record in var partitionRecord
-      * - move my range partitioned file to shuffledFileDirectory
-      */
     def partitionByPivot() = {
-        val partition = WorkerJob.partitionByPivot(workerPivots, workerOrder)
-        logger.info("PARTITION : partitioning is done") 
-        val partitionInfo = 
-            partition.map{case (address, files) => PartitionInfo(address.toString, files.map(file => file.getName).toSeq)}.toSeq
-        val request = PartitionRequest(partitionInfo = partitionInfo)
-        try {
-            val response = blockingStub.getPartitionInfo(request)
-            shuffleCandidate = response.workers.toList
-            logger.info("PARTITION : ready to shuffle") 
-        } 
-        catch {
-            case e: StatusRuntimeException =>
-            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
-            false
-        }   
+        partition = WorkerJob.partitionByPivot(workerPivots, workerOrder)
     }
 
-    /** "master-worker" function 
-      * functionality: get information of my partitioned file distribution in other worker
-      * - give partitionRecord to master
-      * - get List of List[(WorkerAddress, List[PartitionFileName])] from master
-      */
-    def getPartitionInfo() = ???
-
-    /** "worker-worker" function
-      * functionality: shuffle partitioned file based on partitionInfo 
-      * - continue shuffling until all partitioned file is received to worker space
-      * - if shuffling done start mergeIntoSortedFile
-      * - save shuffled file in shuffledFileDirectory
-      */
     def shuffle() = ???
  
-    /** "worker main" function
-      * functionality: merge all received partitioned file in 
-      * - call function from WorkerJob.scala
-      * - save file in outputFileDirectory 
-      * - save min and max value of merged data
-      */
     def mergeIntoSortedFile(outputFileDirectory: String) = {
-        val shuffleFiles = readFilesfromDirectory(shufflePath)
-        WorkerJob.mergeIntoSortedFile(shuffleFiles, currentDirectory + outputFileDirectory + mergedOutput)
-
+        val shuffleFiles = readFilesfromDirectory(workerDirectory + shufflePath)
+        
+        assert(shuffleFiles != Nil)
+        val finalOutputName = currentDirectory + outputFileDirectory + mergedOutput
+        WorkerJob.mergeIntoSortedFile(shuffleFiles, finalOutputName)
+        val minMax = WorkerJob.extractMinMaxKey(new File(finalOutputName))
+        min = minMax._1
+        max = minMax._2
     }
 
     def mergeDone() = {
+        assert(min != "" && max != "")
         val pivot = Option(Pivot(min = min, max = max))
-        val request = DoneRequest(address = myAddress, pivot = pivot)
+        val request = DoneRequest(address = myEndpoint, pivot = pivot)
         try {
             val response = blockingStub.mergeDone(request)
             logger.info("TERMINATE")
+            // fileHandler.close()
         } 
         catch {
             case e: StatusRuntimeException =>
