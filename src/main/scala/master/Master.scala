@@ -1,6 +1,6 @@
 package cs332.master
 
-import java.util.logging.Logger
+import java.util.logging.{Logger, FileHandler, SimpleFormatter}
 import io.grpc.{Server, ServerBuilder}
 
 import java.util.concurrent.CountDownLatch
@@ -15,6 +15,7 @@ import cs332.worker.WorkerJob
 import cs332.common.Util.{getIPaddress, currentDirectory, makeSubdirectory, splitEndpoint, readFilesfromDirectory}
 import java.nio.file.StandardOpenOption
 import java.io.IOException
+import cs332.common.Util
 
 object Master {
     def main(args: Array[String]): Unit = {
@@ -35,17 +36,21 @@ object Master {
 
 class Master(executionContext: ExecutionContext, workerCount: Int) {self => 
     private [this] var server: Server = null
+    private val masterDirectory = makeSubdirectory(currentDirectory, "master") + "/"
     
     private val logger = Logger.getLogger(classOf[Master].getName)
+
     private val workerLatch: CountDownLatch = new CountDownLatch(workerCount)
     private var workers: List[Worker] = List()
     private var workerDone: List[(String, Pivot)] = List()
     private var workerPivots: List[Worker] = List()
-    private val samplesPath = "samples"
+    private val samplesPath = "sampled"
     private val sortedSamples = "sortedSamples"
     private val SERVER_PATH = Paths.get(makeSubdirectory(currentDirectory, samplesPath))
 
     private def start(): Unit = {
+        logger.addHandler(Util.createHandler(masterDirectory, "master.log"))
+
         server = ServerBuilder.forPort(Master.port).addService(SorterGrpc.bindService(new SorterImpl, executionContext)).build.start
         logger.info("Server has client Count of " + self.workerCount)
         logger.info("Server started, listening on " + Master.port)
@@ -95,6 +100,8 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             if (workerDone.length == workerCount) {
                 // pass workerDone and workers and validation
                 // call function in MasterJob.scala
+                
+                logger.info("TERMINATE")
                 self.stop()
             }
         }
@@ -147,12 +154,19 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                     WorkerJob.mergeIntoSortedFile(sampleFiles, SERVER_PATH + "/" + sortedSamples)
                     val samplesContent = new File(SERVER_PATH + "/" + sortedSamples)
                     workerPivots = MasterJob.setPivot(samplesContent, workers)
+                    logger.info("PIVOT : setting pivot is done")
                     val reply = PivotResponse(status = status, workerPivots = workerPivots)
 
                     responseObserver.onNext(reply)
                     responseObserver.onCompleted()
                 }
             }
+        }
+
+        override def getPartitionInfo(req: PartitionRequest) = {
+            System.out.println(req)
+            val reply = PartitionResponse(workers = Seq("1", "2", "3"))
+            Future.successful(reply)
         }
 
         private def getFilePath(path: Path, fileName: String): OutputStream = {

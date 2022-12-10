@@ -8,7 +8,8 @@ import io.grpc.{StatusRuntimeException, ManagedChannelBuilder, ManagedChannel}
 import java.util.concurrent.CountDownLatch
 import cs332.protos.sorting.SorterGrpc._
 import cs332.protos.sorting._
-import cs332.common.Util.{getIPaddress, currentDirectory, splitEndpoint}
+import cs332.common.Util.{getIPaddress, currentDirectory, splitEndpoint, readFilesfromDirectory}
+import cs332.common.Util
 import cs332.worker.WorkerJob._
 import java.io.{File, InputStream}
 import io.grpc.stub.StreamObserver
@@ -76,14 +77,17 @@ class Worker private(
     type FileAddress = String
     type WorkerAddress = String
 
+    private val workerDirectory = Util.makeSubdirectory(currentDirectory, "worker") + "/"
+
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
     private val myAddress: WorkerAddress = getIPaddress
     private var workerOrder:Int = -1
     private var workerPivots: List[cs332.protos.sorting.Worker]= null 
     
     private val pivotLatch: CountDownLatch = new CountDownLatch(1)
-    
-
+    private var shuffleCandidate: List[String] = null
+    private val shufflePath: String = "shuffled"
+    private val mergedOutput: String = "mergedOutput"
     val min = "" 
     val max = ""
     def shutdown(): Unit = {
@@ -91,6 +95,8 @@ class Worker private(
     }
 
     def register(): Boolean = {
+        
+        logger.addHandler(Util.createHandler(workerDirectory, "worker.log"))
         val endpoint = myAddress + ":" + myPort
         // val endpoint = myAddress 
         val request = RegisterRequest(address = endpoint)
@@ -99,11 +105,11 @@ class Worker private(
             var registerSuccess = false
             if (response.workerOrder != -1) {
                 workerOrder = response.workerOrder
-                logger.info("Registration Success as Worker " + workerOrder)
+                logger.info("REGISTER : success as worker " + workerOrder)
                 registerSuccess = true
             }
             else {
-                logger.info("Registration Failed")
+                logger.info("REGISTER : fail")
             }
             registerSuccess
         } 
@@ -132,10 +138,12 @@ class Worker private(
     def externalSort(inputFileDirectory: Array[FileAddress]): Unit = {
         val inputFiles = getFilesFromDirectories(inputFileDirectory)
         WorkerJob.externalMergeSort(inputFiles)
+        logger.info("EXTERNAL MERGE SORT : done") 
     }
 
     def sample(): Unit = {
         WorkerJob.sampling()
+        logger.info("SAMPLE : sampline is done") 
     }
 
     def sendSample(): Unit = {
@@ -149,9 +157,6 @@ class Worker private(
                     logger.info(
                             "File upload status :: " + response.status
                     ) 
-                    logger.info(
-                        "worker pivots " + workerPivots
-                    )
                 }
 
                 override def onError(throwaable: Throwable): Unit = {}
@@ -179,6 +184,7 @@ class Worker private(
         
         inputStream.close()
         streamObserver.onCompleted()
+        logger.info("SAMPLE : sending sample is done") 
         pivotLatch.await()
     }
 
@@ -191,31 +197,21 @@ class Worker private(
       * - move my range partitioned file to shuffledFileDirectory
       */
     def partitionByPivot() = {
-       
-        // System.out.println("workerPivots:" + workerPivots)
         val partition = WorkerJob.partitionByPivot(workerPivots, workerOrder)
-
-        // val request = par(address = endpoint)
-        // try {
-        //     val response = blockingStub.registerWorker(request)
-        //     var registerSuccess = false
-        //     if (response.workerOrder != -1) {
-        //         workerOrder = response.workerOrder
-        //         logger.info("Registration Success as Worker " + workerOrder)
-        //         registerSuccess = true
-        //     }
-        //     else {
-        //         logger.info("Registration Failed")
-        //     }
-        //     registerSuccess
-        // } 
-        // catch {
-        //     case e: StatusRuntimeException =>
-        //     logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
-        //     false
-        // }
-        
-         // assertion all pivots in workerPivots are not ""
+        logger.info("PARTITION : partitioning is done") 
+        val partitionInfo = 
+            partition.map{case (address, files) => PartitionInfo(address.toString, files.map(file => file.getName).toSeq)}.toSeq
+        val request = PartitionRequest(partitionInfo = partitionInfo)
+        try {
+            val response = blockingStub.getPartitionInfo(request)
+            shuffleCandidate = response.workers.toList
+            logger.info("PARTITION : ready to shuffle") 
+        } 
+        catch {
+            case e: StatusRuntimeException =>
+            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
+            false
+        }   
     }
 
     /** "master-worker" function 
@@ -239,14 +235,18 @@ class Worker private(
       * - save file in outputFileDirectory 
       * - save min and max value of merged data
       */
-    def mergeIntoSortedFile() = ???
+    def mergeIntoSortedFile(outputFileDirectory: String) = {
+        val shuffleFiles = readFilesfromDirectory(shufflePath)
+        WorkerJob.mergeIntoSortedFile(shuffleFiles, currentDirectory + outputFileDirectory + mergedOutput)
+
+    }
 
     def mergeDone() = {
         val pivot = Option(Pivot(min = min, max = max))
         val request = DoneRequest(address = myAddress, pivot = pivot)
         try {
             val response = blockingStub.mergeDone(request)
-            logger.info("alerted master that merging is done and terminating...")
+            logger.info("TERMINATE")
         } 
         catch {
             case e: StatusRuntimeException =>

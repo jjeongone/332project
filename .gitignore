@@ -17,3 +17,5 @@ src/main/scala/worker/input/*
 partition*
 external*
 sample*
+worker/*
+master/*
