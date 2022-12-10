@@ -33,10 +33,16 @@ enum Status {
   FAILED = 3;
 }
 
+enum Role {
+  CLIENT = 0;
+  SERVER = 2;
+}
+
 service Sorter {
   rpc registerWorker (RegisterRequest) returns (RegisterResponse) {}
   rpc getWorkerPivots (stream PivotRequest) returns (PivotResponse) {}
   rpc getPartitionInfo (PartitionRequest) returns (PartitionResponse) {}
+  rpc workerFileServerManagement (FileServerRequest) returns (FileServerResponse) {}
   rpc mergeDone (DoneRequest) returns (DoneResponse) {}
 }
 
@@ -64,6 +70,15 @@ message PartitionRequest {
 
 message PartitionResponse {
   repeated string workers = 1;
+}
+
+message FileServerRequest {
+  int32 workerOrder = 1;
+}
+
+message FileServerResponse {
+  bool status = 1;
+  Role role = 2;
 }
 
 message DoneRequest {
