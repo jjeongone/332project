@@ -2,19 +2,22 @@ package cs332.worker
 
 import java.util.concurrent.TimeUnit
 import java.util.logging.{Level, Logger}
-
-import io.grpc.{StatusRuntimeException, ManagedChannelBuilder, ManagedChannel}
+import io.grpc.{ManagedChannel, ManagedChannelBuilder, StatusRuntimeException}
 
 import java.util.concurrent.CountDownLatch
 import cs332.protos.sorting.SorterGrpc._
 import cs332.protos.sorting._
-import cs332.common.Util.{getIPaddress, currentDirectory, splitEndpoint, readFilesfromDirectory}
+import cs332.common.Util.{currentDirectory, getIPaddress, readFilesfromDirectory, splitEndpoint}
 import cs332.common.Util
 import cs332.worker.WorkerJob._
+
 import java.io.{File, InputStream}
 import io.grpc.stub.StreamObserver
+
 import java.nio.file.{Files, Paths}
 import com.google.protobuf.ByteString
+import worker.client.WorkerFileClient
+import worker.server.WorkerFileServer
 
 object Worker {
     def apply(host: String, port: Int): Worker = {
@@ -28,7 +31,10 @@ object Worker {
     def main(args: Array[String]): Unit = {
         val masterEndpoint = args.headOption
         val inputFileDirectory = args.slice(args.indexOf("-I")+1, args.indexOf("-O"))
-        val outputFileDirectory = args.slice(args.indexOf("-O")+1, args.length)
+        val outputFileDirectory = args.slice(args.indexOf("-O")+1, args.indexOf("-N"))
+        val tempWorkerOrder = args.slice(args.indexOf("-N")+1, args.length)(0).toInt
+
+        System.out.println("worker order is " + tempWorkerOrder)
 
         if (masterEndpoint.isEmpty) {
             System.out.println("Master endpoint is not ready")
@@ -52,11 +58,22 @@ object Worker {
 
                 }
                 else {
-                    client.externalSort(inputFileDirectory)
-                    client.sample()
-                    client.sendSample()
-                    client.partitionByPivot()
-                    client.mergeDone()
+//                    client.externalSort(inputFileDirectory)
+//                    client.sample()
+//                    client.sendSample()
+//                    client.partitionByPivot()
+//                    client.mergeDone()
+                    if (tempWorkerOrder == 1) {
+                        WorkerFileServer.main(tempWorkerOrder)
+                    } else {
+                        val tempWorkerList = List(("172.17.0.3:50053", 1), ("172.17.0.4:50053", 2))
+                        val shuffle = tempWorkerList.map(worker => {
+                            if (worker._2 != tempWorkerOrder) {
+                                WorkerFileClient.main(worker._1.split(":")(0), worker._1.split(":")(1).toInt)
+                            }
+                        })
+                        System.out.println("shuffling result: " + shuffle)
+                    }
                 }
                 
             } finally {

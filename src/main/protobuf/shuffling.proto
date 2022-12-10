@@ -5,6 +5,7 @@ package cs332.file.protos;
 message Metadata {
   string fileName = 1;
   string fileType = 2;
+  int32 workerOrder = 3;
 }
 
 message FileMessage {
@@ -12,7 +13,16 @@ message FileMessage {
 }
 
 service Shuffler {
+  rpc registerFileServer (RegisterRequest) returns (RegisterResponse) {}
   rpc shuffling (ShuffleRequest) returns (stream ShuffleResponse) {}
+}
+
+message RegisterRequest {
+  string address = 1;
+}
+
+message RegisterResponse {
+  bool status = 1;
 }
 
 message ShuffleRequest {

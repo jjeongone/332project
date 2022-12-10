@@ -15,8 +15,8 @@ import scala.concurrent.{ExecutionContext, Future}
 object WorkerFileServer {
   private val logger = Logger.getLogger(classOf[WorkerFileServer].getName)
 
-  def main(): Unit = {
-    val server = new WorkerFileServer(ExecutionContext.global)
+  def main(workerOrder: Int): Unit = {
+    val server = new WorkerFileServer(ExecutionContext.global, workerOrder)
     server.start()
     server.blockUntilShutdown()
   }
@@ -24,7 +24,7 @@ object WorkerFileServer {
   private val port = 50053
 }
 
-class WorkerFileServer(executionContext: ExecutionContext) {self =>
+class WorkerFileServer(executionContext: ExecutionContext, workerOrder: Int) {self =>
   private [this] var server: Server = null
 
   private def start(): Unit = {
@@ -50,6 +50,11 @@ class WorkerFileServer(executionContext: ExecutionContext) {self =>
   }
 
   private class ShufflerImpl extends ShufflerGrpc.Shuffler {
+    override def registerFileServer(request: RegisterRequest): Future[RegisterResponse] = {
+      val res = RegisterResponse(status = true)
+      WorkerFileServer.logger.info("Worker file server connection...")
+      Future.successful(res)
+    }
     override def shuffling(request: ShuffleRequest, responseObserver: StreamObserver[ShuffleResponse]): Unit = {
       WorkerFileServer.logger.info("Will try to shuffle files "  + " ...")
       val pathStrings = List("src/main/scala/worker/input/sample/sample0.1", "src/main/scala/worker/input/sample/sample1.1", "src/main/scala/worker/input/sample/sample2.1")
@@ -57,7 +62,7 @@ class WorkerFileServer(executionContext: ExecutionContext) {self =>
         val path = Paths.get(pathString)
 
         val fileName = pathString.split('/').last
-        val metadata = Metadata(fileName = fileName.split('.').head, fileType = fileName.split('.').last)
+        val metadata = Metadata(fileName = fileName.split('.').head, fileType = fileName.split('.').last, workerOrder = workerOrder)
 
         val inputStream: InputStream = Files.newInputStream(path)
         var bytes = Array.ofDim[Byte](2000000)

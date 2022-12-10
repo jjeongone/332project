@@ -1,6 +1,7 @@
 package worker.client
 
-import cs332.file.protos.shuffling.{ShuffleRequest, ShuffleResponse, ShufflerGrpc}
+import cs332.common.Util.getIPaddress
+import cs332.file.protos.shuffling.{RegisterRequest, ShuffleRequest, ShuffleResponse, ShufflerGrpc}
 import cs332.file.protos.shuffling.ShufflerGrpc.{ShufflerBlockingStub, ShufflerStub}
 
 import java.util.logging.{Level, Logger}
@@ -17,25 +18,55 @@ object WorkerFileClient {
     val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build
     val blockingStub = ShufflerGrpc.blockingStub(channel)
     val newStub = ShufflerGrpc.stub(channel)
-    new WorkerFileClient(channel, blockingStub, newStub)
+    new WorkerFileClient(channel, blockingStub, newStub, workerFilePort)
   }
 
   def main(ipAddress: String, port: Int): Unit = {
     val client = WorkerFileClient(ipAddress, port)
+    System.out.println("Connecting to " + ipAddress + ":" + port)
+
     try {
-      client.shuffle()
+      val succeedRegistration = client.register()
+      if (!succeedRegistration) {
+        client.shutdown()
+      } else {
+//        client.shuffle()
+      }
     } finally {
       client.shutdown()
     }
   }
+
+  private val workerFilePort = 50080
 }
 
-class WorkerFileClient private (private val channel: ManagedChannel, private val blockingStub: ShufflerBlockingStub, private val newStub: ShufflerStub) {
+class WorkerFileClient private (private val channel: ManagedChannel, private val blockingStub: ShufflerBlockingStub, private val newStub: ShufflerStub, private val myPort: Int) {
   private [this] val logger = Logger.getLogger(classOf[WorkerFileClient].getName)
   private val SERVER_PATH = Paths.get("src/main/scala/worker/sample")
+  private val myAddress = getIPaddress
 
   def shutdown(): Unit = {
     channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
+  }
+
+  def register(): Boolean = {
+    val endpoint = myAddress + ":" + myPort
+    logger.info("REGISTER : current endpoint " + endpoint)
+    val req = RegisterRequest(address = endpoint)
+    try {
+      logger.info("REGISTER : try to connecting...")
+      val res = blockingStub.registerFileServer(req)
+      if (res.status) {
+        logger.info("REGISTER : file server registration success")
+      } else {
+        logger.info("REGISTER : file server registration fail")
+      }
+      res.status
+    } catch {
+      case e: StatusRuntimeException =>
+        logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
+        false
+    }
   }
 
   def shuffle(): Unit = {
@@ -46,6 +77,7 @@ class WorkerFileClient private (private val channel: ManagedChannel, private val
     val request = ShuffleRequest(address = "localhost", count = "2")
     try {
       val responses = blockingStub.shuffling(request)
+      logger.info("responses" + responses)
       while(responses.hasNext) {
         val res = responses.next()
         if (sampleFileName == null) {
@@ -62,7 +94,7 @@ class WorkerFileClient private (private val channel: ManagedChannel, private val
   }
 
   private def getFilePath(req: ShuffleResponse): OutputStream = {
-    val fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
+    val fileName = req.metadata.get.workerOrder + "." + req.metadata.get.fileName + "." + req.metadata.get.fileType
     Files.newOutputStream(SERVER_PATH.resolve(fileName), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
   }
 
