@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package cs332.file.protos;
+
+message Metadata {
+  string fileName = 1;
+  string fileType = 2;
+}
+
+message FileMessage {
+  bytes content = 1;
+}
+
+service Shuffler {
+  rpc shuffling (ShuffleRequest) returns (stream ShuffleResponse) {}
+}
+
+message ShuffleRequest {
+  string address = 1;
+  string count = 2;
+}
+
+message ShuffleResponse {
+  Metadata metadata = 1;
+  FileMessage file = 2;
+}
