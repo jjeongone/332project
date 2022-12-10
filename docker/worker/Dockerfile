@@ -16,10 +16,9 @@ WORKDIR /code
 
 COPY . .
 
-RUN mkdir input-data output-data
+RUN mkdir input-data
+RUN mkdir output-data
 
-#COPY --from=generator /script/partition* input-data
-
-ENV SBT_OPTS="-Xmx8G -Xms4G -Xss1G"
+COPY --from=generator /script/partition* input-data
 
 ENTRYPOINT ["sbt"]

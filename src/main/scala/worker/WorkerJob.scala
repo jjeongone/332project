@@ -49,11 +49,11 @@ object WorkerJob{
         ExternalSort.mergeSortedFiles(batchFileList, outputFile, cmp)
         outputFile :: acc
         })
-        mergeIntoSortedFile(sortedFiles, outputPath + externalSortFile)
+        mergeIntoSortedFile(sortedFiles, outputPath + "/" + externalSortFile)
     }
     
     def sampling(): Unit = {
-        val lines = Source.fromFile(new File(currentDirectory + externalSortPath + externalSortFile)).getLines().toList
+        val lines = Source.fromFile(new File(currentDirectory + externalSortPath +"/" +  externalSortFile)).getLines().toList
         val sampleFilename = new File(currentDirectory + sampleFile)
         val bw = new BufferedWriter(new FileWriter(sampleFilename))
         val samples = lines.foldLeft((List[Key](), 0))((acc, line) => {
@@ -67,7 +67,7 @@ object WorkerJob{
     }
 
     def partitionByPivot(workers: List[Worker], workerOrder: Int): Map[Address, List[File]] = {
-        val file = new File(outputPath + externalSortFile)
+        val file = new File(outputPath + "/" + externalSortFile)
         val maxNumLines = 10
         val scanner = new Scanner(file)
         def getLines(numLines: Int, lines: List[String]): List[String] = {

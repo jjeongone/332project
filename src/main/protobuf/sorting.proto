@@ -21,6 +21,11 @@ message FileMessage {
   bytes content = 1;
 }
 
+message PartitionInfo {
+  string worker = 1;
+  repeated string fileNames = 2;
+}
+
 enum Status {
   PENDING = 0;
   IN_PROGRESS = 1;
@@ -28,10 +33,16 @@ enum Status {
   FAILED = 3;
 }
 
+enum Role {
+  CLIENT = 0;
+  SERVER = 2;
+}
+
 service Sorter {
   rpc registerWorker (RegisterRequest) returns (RegisterResponse) {}
   rpc getWorkerPivots (stream PivotRequest) returns (PivotResponse) {}
-
+  rpc getPartitionInfo (PartitionRequest) returns (PartitionResponse) {}
+  rpc workerFileServerManagement (FileServerRequest) returns (FileServerResponse) {}
   rpc mergeDone (DoneRequest) returns (DoneResponse) {}
 }
 
@@ -52,6 +63,24 @@ message PivotResponse {
   Status status = 1;
   repeated Worker workerPivots = 2;
 }
+
+message PartitionRequest {
+  repeated PartitionInfo partitionInfo = 1;
+}
+
+message PartitionResponse {
+  repeated string workers = 1;
+}
+
+message FileServerRequest {
+  int32 workerOrder = 1;
+}
+
+message FileServerResponse {
+  bool status = 1;
+  Role role = 2;
+}
+
 message DoneRequest {
   string address = 1;
   Pivot pivot = 2;

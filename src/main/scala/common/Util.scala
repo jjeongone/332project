@@ -3,7 +3,7 @@ package cs332.common
 import java.net.{DatagramSocket, InetAddress}
 import java.nio.file.{Files, Paths}
 
-import java.util.logging.Logger
+import java.util.logging.{Logger, FileHandler, SimpleFormatter}
 import java.io.File
 
 object Util {
@@ -22,11 +22,12 @@ object Util {
     def makeSubdirectory(currentDirectory: String, subDirectory: String): String = {
         val newDir = new File(currentDirectory + subDirectory)
         val newPath = newDir.toString()
-        if (newDir.mkdir()) {
-            logger.info(newPath + "was created successfully")
-        } else {
-            logger.info("failed trying to create" + newPath)
-        }
+        newDir.mkdir()
+        // if (newDir.mkdir()) {
+        //     logger.info(newPath + "was created successfully")
+        // } else {
+        //     logger.info("failed trying to create" + newPath)
+        // }
         newPath
     }
 
@@ -48,5 +49,13 @@ object Util {
         }
 
         files
+    }
+
+    def createHandler(directory: String,fileName: String): FileHandler = {
+        Files.deleteIfExists(Paths.get(directory + fileName))
+        val fileHandler = new FileHandler(directory + fileName, false)
+        val simpleFormatter = new SimpleFormatter()
+        fileHandler.setFormatter(simpleFormatter)
+        fileHandler
     }
 }
