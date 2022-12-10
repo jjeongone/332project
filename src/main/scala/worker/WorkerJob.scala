@@ -10,12 +10,13 @@ import java.nio.charset.Charset
 import java.util.{Comparator, Scanner}
 import scala.jdk.CollectionConverters._
 import com.google.code.externalsorting.ExternalSort
+import scala.annotation.tailrec
 
 object WorkerJob{
     type Key = String
-  type Address = String
+    type Address = String
     val bytesPerLine = 100
-  val maxPartitionSize = 104857600
+    val maxPartitionSize = 104857600
     val samplingFactor = 100
     val externalSortPath = "externalSorted"
     val tmpPath4External = "tmp4External"
@@ -42,11 +43,13 @@ object WorkerJob{
 
     def externalMergeSort(files: List[File]): Unit = {
         val sortedFiles = files.foldLeft(List[File]())((acc, file) => {
-        val batchFileList = ExternalSort.sortInBatch(new BufferedReader(new FileReader(file)), 100, cmp,
+        val br = new BufferedReader(new FileReader(file))
+        val batchFileList = ExternalSort.sortInBatch(br, 100, cmp,
             ExternalSort.DEFAULTMAXTEMPFILES, ExternalSort.estimateAvailableMemory(), Charset.defaultCharset(),
             new File(tmpfilesPath), false, 0, false, true)
         val outputFile = new File(tmpfilesPath + acc.length.toString())
         ExternalSort.mergeSortedFiles(batchFileList, outputFile, cmp)
+        br.close()
         outputFile :: acc
         })
         mergeIntoSortedFile(sortedFiles, outputPath + "/" + externalSortFile)
@@ -68,30 +71,39 @@ object WorkerJob{
 
     def partitionByPivot(workers: List[Worker], workerOrder: Int): Map[Address, List[File]] = {
         val file = new File(outputPath + "/" + externalSortFile)
-        val maxNumLines = 10
+        val maxNumLines = 10000
         val scanner = new Scanner(file)
-        def getLines(numLines: Int, lines: List[String]): List[String] = {
+
+        @tailrec
+        def getLines(numLines: Int, lines: scala.collection.immutable.Queue[String]): scala.collection.immutable.Queue[String] = {
         if (numLines == 0 || !scanner.hasNextLine()) lines
         else getLines(numLines - 1, lines :+ scanner.nextLine())
         }
 
         def workerToFileName(workerAddress: Address, index: Int): String = outputPath + "/" +  "partition" + workerOrder.toString + "." + index.toString()
-        def linesToFileContent(lines: List[String]): String = lines.foldRight("")((line, acc) => acc + line + "\n")
+        def linesToFileContent(lines: List[String]): String = {
+            val contentBuffer = new java.lang.StringBuffer()
+            lines.foldRight("")((line, acc) => {
+                contentBuffer.append(line)
+                contentBuffer.append("\n")
+            })
+            contentBuffer.toString()
+        }
     //    val linesFromFile = Source.fromFile(file).getLines()
 
         def unionMap(map0: Map[Address, List[File]], map1: Map[Address, List[File]]): Map[Address, List[File]] = {
         map0.foldLeft(map1)((acc, keyval) => acc.get(keyval._1) match {
-            case None => acc
-            case Some(v) => acc ++ Map(keyval._1 -> (keyval._2 ::: v))
+            case None => acc + (keyval._1 -> keyval._2)
+            case Some(v) => acc + (keyval._1 -> (keyval._2.toSet ++ v.toSet).toList)
         })
         }
 
         // Map[Address, (file index, number of lines)]
-        def initializeNamingIndex: Map[Address, (Int, Int)] = workers.foldLeft(Map[Address, (Int, Int)]())((acc, worker) => acc ++ Map(worker.address -> (0, 0)))
+        def initializeNamingIndex: Map[Address, (Int, Int)] = workers.foldLeft(Map[Address, (Int, Int)]())((acc, worker) => acc + (worker.address -> (0, 0)))
 
         def executePartitionByPivotAux(acc: Map[Address, List[File]], namingIndex: Map[Address, (Int, Int)]): Map[Address, List[File]] = {
         if (scanner.hasNextLine()) {
-            val linesFromFile = getLines(maxNumLines, List[String]())
+            val linesFromFile = getLines(maxNumLines, scala.collection.immutable.Queue[String]())
             val result = partitionByPivotAux(linesFromFile, namingIndex)
             val resultFiles = result.map((keyval: (Address, (List[File], (Int, Int)))) => (keyval._1, keyval._2._1))
             val resultNamingIndex = result.map((keyval: (Address, (List[File], (Int, Int)))) => (keyval._1, keyval._2._2))
@@ -102,7 +114,7 @@ object WorkerJob{
         }
         }
 
-        def partitionByPivotAux(linesFromFile: List[String], namingIndex: Map[Address, (Int, Int)]): Map[Address, (List[File], (Int, Int))] = {
+        def partitionByPivotAux(linesFromFile: scala.collection.immutable.Queue[String], namingIndex: Map[Address, (Int, Int)]): Map[Address, (List[File], (Int, Int))] = {
         val mapWorkerToLines = linesFromFile.foldLeft(Map[Worker, List[(List[String], (Int, Int))]]())((acc, line) => {
             val workerCorrespondingToLine = workers.find(worker => worker.pivot.get.min <= line.slice(0, 10) && line.slice(0, 10) <= worker.pivot.get.max)
             workerCorrespondingToLine match {
@@ -111,12 +123,12 @@ object WorkerJob{
                 acc.get(worker) match {
                 case None => {
                     val (recentFileIndex, recentNumLines) = namingIndex(worker.address)
-                    if ((recentNumLines + 1) * bytesPerLine <= maxPartitionSize) acc ++ Map(worker -> List((List(line), (recentFileIndex, recentNumLines + 1))))
-                    else acc ++ Map(worker -> List((List(line), (recentFileIndex + 1, 1))))
+                    if ((recentNumLines + 1) * bytesPerLine <= maxPartitionSize) acc + (worker -> List((List(line), (recentFileIndex, recentNumLines + 1))))
+                    else acc + (worker -> List((List(line), (recentFileIndex + 1, 1))))
                 }
                 case Some(lines) => {
-                    if ((lines.head._2._2 + 1) * bytesPerLine <= maxPartitionSize) acc ++ Map(worker -> ((line :: lines.head._1, (lines.head._2._1, lines.head._2._2 + 1)) :: lines.tail))
-                    else acc ++ Map(worker -> ((List(line), (lines.head._2._1 + 1, 1)) :: lines))
+                    if ((lines.head._2._2 + 1) * bytesPerLine <= maxPartitionSize) acc + (worker -> ((line :: lines.head._1, (lines.head._2._1, lines.head._2._2 + 1)) :: lines.tail))
+                    else acc + (worker -> ((List(line), (lines.head._2._1 + 1, 1)) :: lines))
                 }
                 }
             }
@@ -129,7 +141,7 @@ object WorkerJob{
             case Some(listLines) => listLines match {
                 case Nil => acc
                 case _ => {
-                val partitionFiles = listLines.foldRight(List[File]())((lines, acc) => {
+                val partitionFiles = listLines.foldRight(scala.collection.immutable.Queue[File]())((lines, acc) => {
                     val linesData = lines._1
                     val linesFileInfo = lines._2
                     val partitionFile = new File(workerToFileName(worker.address, linesFileInfo._1))
@@ -138,7 +150,7 @@ object WorkerJob{
                     writerToPartitionFile.close()
                     acc :+ partitionFile
                 })
-                acc ++ Map(worker.address -> (partitionFiles, listLines.head._2))
+                acc + (worker.address -> (partitionFiles.toList, listLines.head._2))
                 }
             }
             }
@@ -150,6 +162,7 @@ object WorkerJob{
     
     def extractMinMaxKey(file: File): (String, String) = {
         val scanner = new Scanner(file)
+        @tailrec
         def extractMinMaxKeyAux(preKey: String): String = {
             if (scanner.hasNextLine()) extractMinMaxKeyAux(scanner.nextLine().slice(0, 10))
             else preKey
