@@ -41,7 +41,7 @@ enum Role {
 service Sorter {
   rpc registerWorker (RegisterRequest) returns (RegisterResponse) {}
   rpc getWorkerPivots (stream PivotRequest) returns (PivotResponse) {}
- // rpc workerFileServerManagement (FileServerRequest) returns (FileServerResponse) {}
+  rpc workerFileServerManagement (FileServerRequest) returns (FileServerResponse) {}
   rpc mergeDone (DoneRequest) returns (DoneResponse) {}
 }
 

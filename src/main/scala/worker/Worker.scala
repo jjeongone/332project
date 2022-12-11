@@ -95,6 +95,7 @@ class Worker private(
     private var partition: Map[String, List[File]] = null
     private var min = "" 
     private var max = ""
+    private var beenFileServer: Boolean = false
     def shutdown(): Unit = {
         channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
     }
@@ -148,7 +149,7 @@ class Worker private(
 
     def sample(): Unit = {
         WorkerJob.sampling(workerDirectory, workerOrder.toString)
-        logger.info("SAMPLE : sampline is done") 
+        logger.info("SAMPLE : sampling is done") 
     }
 
     def sendSample(): Unit = {

@@ -31,7 +31,7 @@ object Master {
         }
     }
 
-    private val port = 50051
+    private val port = 50055
 
 }
 
@@ -49,7 +49,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private var workerDone: List[(String, (String, String))] = List()
     private val samplesPath = "sampled"
     private val sortedSamples = "sortedSamples"
-    private val SERVER_PATH = Paths.get(makeSubdirectory(currentDirectory, samplesPath))
+    private val sampleDirectory = Paths.get(makeSubdirectory(masterDirectory, samplesPath) + "/")
 
     private def start(): Unit = {
 
@@ -96,11 +96,11 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
 
     private def calculatePivot(): Unit = {
         this.synchronized{
-            val sampleFiles = readFilesfromDirectory(samplesPath).filter(file => !(file.toString.contains(sortedSamples)))
+            val sampleFiles = readFilesfromDirectory(sampleDirectory.toString).filter(file => !(file.toString.contains(sortedSamples)))
 
             if (sampleFiles.length == workerCount) {
-                WorkerJob.mergeIntoSortedFile(sampleFiles, SERVER_PATH + "/" + sortedSamples)
-                val samplesContent = new File(SERVER_PATH + "/" + sortedSamples)
+                WorkerJob.mergeIntoSortedFile(sampleFiles, sampleDirectory + sortedSamples)
+                val samplesContent = new File(sampleDirectory + sortedSamples)
                 workers = MasterJob.setPivot(samplesContent, workers)
                 pivotLatch.countDown()
             }
@@ -151,6 +151,8 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             Future.successful(reply)
         }
 
+        override def workerFileServerManagement(req: FileServerRequest) = ???
+
         override def getWorkerPivots(responseObserver: StreamObserver[PivotResponse]): StreamObserver[PivotRequest] = {
             new StreamObserver[PivotRequest]() {
                 var writer: OutputStream = null
@@ -161,7 +163,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 override def onNext(req: PivotRequest): Unit = {
                     val fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
          
-                    writer = getFilePath(SERVER_PATH, fileName)   
+                    writer = getFilePath(sampleDirectory, fileName)   
 
                     writeFile(writer, req.file.get.content.toString("UTF-8"))
                 }    
