@@ -30,19 +30,19 @@ object WorkerFileClient {
       if (!succeedRegistration) {
         client.shutdown()
       } else {
-//        client.shuffle()
+        client.shuffle()
       }
     } finally {
       client.shutdown()
     }
   }
 
-  private val workerFilePort = 50080
+  private val workerFilePort = 8081
 }
 
 class WorkerFileClient private (private val channel: ManagedChannel, private val blockingStub: ShufflerBlockingStub, private val newStub: ShufflerStub, private val myPort: Int) {
   private [this] val logger = Logger.getLogger(classOf[WorkerFileClient].getName)
-  private val SERVER_PATH = Paths.get("src/main/scala/worker/sample")
+  private val SERVER_PATH = Paths.get("src/main/scala/worker/input")
   private val myAddress = getIPaddress
 
   def shutdown(): Unit = {
@@ -52,21 +52,24 @@ class WorkerFileClient private (private val channel: ManagedChannel, private val
   def register(): Boolean = {
     val endpoint = myAddress + ":" + myPort
     logger.info("REGISTER : current endpoint " + endpoint)
-    val req = RegisterRequest(address = endpoint)
-    try {
-      logger.info("REGISTER : try to connecting...")
-      val res = blockingStub.registerFileServer(req)
-      if (res.status) {
-        logger.info("REGISTER : file server registration success")
-      } else {
-        logger.info("REGISTER : file server registration fail")
+    var successToConnect = false
+    while (!successToConnect) {
+      val req = RegisterRequest(address = endpoint)
+      try {
+        logger.info("REGISTER : try to connecting...")
+        val res = blockingStub.registerFileServer(req)
+        if (res.status) {
+          logger.info("REGISTER : file server registration success")
+          successToConnect = true
+        } else {
+          logger.info("REGISTER : file server registration fail")
+        }
+      } catch {
+        case e: StatusRuntimeException =>
+          logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
       }
-      res.status
-    } catch {
-      case e: StatusRuntimeException =>
-        logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
-        false
     }
+    successToConnect
   }
 
   def shuffle(): Unit = {

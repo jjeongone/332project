@@ -21,7 +21,7 @@ object WorkerFileServer {
     server.blockUntilShutdown()
   }
 
-  private val port = 50053
+  private val port = 8080
 }
 
 class WorkerFileServer(executionContext: ExecutionContext, workerOrder: Int) {self =>
