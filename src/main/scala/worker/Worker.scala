@@ -138,6 +138,7 @@ class Worker private(
                 logger.info("Input File directories do not exist or are not directories") 
             }
         }
+        assert(inputFiles != List[File]())
         inputFiles
     }
     

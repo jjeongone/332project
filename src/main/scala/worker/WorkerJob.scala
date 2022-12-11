@@ -76,7 +76,7 @@ object WorkerJob{
 
     def partitionByPivot(workers: List[Worker], workerOrder: Int): Map[Address, List[File]] = {
    
-        val file = new File(outputPath + "/" + externalSortFile  + "."+ workerOrder.toString)
+        val file = new File(outputPath + externalSortFile  + "."+ workerOrder.toString)
         val maxNumLines = 10000
         val scanner = new Scanner(file)
 
