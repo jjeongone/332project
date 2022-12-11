@@ -1,8 +1,11 @@
 package  cs332.master
 
 import java.io.File
+import java.util.Scanner
 import scala.io.Source
+import scala.annotation.tailrec
 import cs332.protos.sorting._
+
 object MasterJob{
     type Key = String
     type Address = String

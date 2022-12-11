@@ -39,6 +39,12 @@ object WorkerJob{
         }
     }
 
+    @tailrec
+    def getPartialLines(numLines: Int, lines: scala.collection.immutable.Queue[String], scanner: Scanner): scala.collection.immutable.Queue[String] = {
+        if (numLines == 0 || !scanner.hasNextLine()) lines
+        else getPartialLines(numLines - 1, lines :+ scanner.nextLine(), scanner)
+    }
+
     def mergeIntoSortedFile(files: List[File], path: String): Unit = {
         val testOutput = new File(path)
         ExternalSort.mergeSortedFiles(files.asJava, testOutput, cmp)
@@ -62,16 +68,32 @@ object WorkerJob{
     }
     
     def sampling(directory: String, fileType: String): Unit = {
-        val lines = Source.fromFile(new File(directory + externalSortPath +"/" +  externalSortFile + "." + fileType)).getLines().toList
+        val file = new File(directory + externalSortPath +"/" +  externalSortFile + "." + fileType)
+        val scanner = new Scanner(file)
+        val maxNumLines = 1000
+        
         val sampleFilename = new File(directory + sampleFile + "." + fileType)
-        val bw = new BufferedWriter(new FileWriter(sampleFilename))
-        val samples = lines.foldLeft((List[Key](), 0))((acc, line) => {
-        if (acc._2 % samplingFactor == 0) (acc._1 :+ line.slice(0, 10), acc._2 + 1)
-        else (acc._1, acc._2 + 1)
-        })._1
-        for (sample <- samples) {
-            bw.write(sample + "\n")
+        val bw = new BufferedWriter(new FileWriter(sampleFilename, true))
+
+        @tailrec
+        def samplingAux(prevSamplingIndex: Int): Unit = {
+            if (scanner.hasNextLine()) {
+                val lines = getPartialLines(maxNumLines, scala.collection.immutable.Queue[String](), scanner)
+                val (samples, recentSamplingIndex) = lines.foldLeft((scala.collection.immutable.Queue[Key](), prevSamplingIndex))((acc, line) => {
+                if (acc._2 % samplingFactor == 0) (acc._1 :+ line.slice(0, 10), acc._2 + 1)
+                else (acc._1, acc._2 + 1)
+                })
+                for (sample <- samples) {
+                    bw.write(sample + "\n")
+                }
+                samplingAux(recentSamplingIndex)
+            }
+            else {
+                ()
+            }
         }
+
+        samplingAux(0)
         bw.close()
         Util.assertEmpty(sampleFilename.toString)
     }
@@ -81,12 +103,6 @@ object WorkerJob{
         val file = new File(outputPath + externalSortFile  + "."+ workerOrder.toString)
         val maxNumLines = 10000
         val scanner = new Scanner(file)
-
-        @tailrec
-        def getLines(numLines: Int, lines: scala.collection.immutable.Queue[String]): scala.collection.immutable.Queue[String] = {
-        if (numLines == 0 || !scanner.hasNextLine()) lines
-        else getLines(numLines - 1, lines :+ scanner.nextLine())
-        }
 
         def workerToFileName(workerAddress: Address, index: Int): String = partitionPath +  "partition" + workerAddress + workerOrder.toString + "." + index.toString()
         def linesToFileContent(lines: List[String]): String = {
@@ -98,7 +114,6 @@ object WorkerJob{
             })
             contentBuffer.toString
         }
-    //    val linesFromFile = Source.fromFile(file).getLines()
 
         def unionMap(map0: Map[Address, List[File]], map1: Map[Address, List[File]]): Map[Address, List[File]] = {
         map0.foldLeft(map1)((acc, keyval) => acc.get(keyval._1) match {
@@ -110,9 +125,10 @@ object WorkerJob{
         // Map[Address, (file index, number of lines)]
         def initializeNamingIndex: Map[Address, (Int, Int)] = workers.foldLeft(Map[Address, (Int, Int)]())((acc, worker) => acc + (worker.address -> (0, 0)))
 
+        @tailrec
         def executePartitionByPivotAux(acc: Map[Address, List[File]], namingIndex: Map[Address, (Int, Int)]): Map[Address, List[File]] = {
         if (scanner.hasNextLine()) {
-            val linesFromFile = getLines(maxNumLines, scala.collection.immutable.Queue[String]())
+            val linesFromFile = getPartialLines(maxNumLines, scala.collection.immutable.Queue[String](), scanner)
             val result = partitionByPivotAux(linesFromFile, namingIndex)
             val resultFiles = result.map((keyval: (Address, (List[File], (Int, Int)))) => (keyval._1, keyval._2._1))
             val resultNamingIndex = result.map((keyval: (Address, (List[File], (Int, Int)))) => (keyval._1, keyval._2._2))
