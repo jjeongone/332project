@@ -11,7 +11,6 @@ test/.bsp
 test/home
 test/target
 *.log
-*.sh
 src/main/scala/master/output/*
 src/main/scala/worker/input/*
 partition*
