@@ -200,3 +200,32 @@ Ubuntu `22.04`, Java `1.8.0` (openjdk-8), scala `2.13.8`
 |김민결|- partitionByPivot 함수 수정|
 |이희우|- 함수 합치기 마무리|
 |최정원|- command aliases 확인 <br/> - gRPC worker-worker 통신 구현|
+
+
+<br>
+
+# Week 8
+
+> 12/09(금)-11(일) meeting 진행
+> 
+
+### Weekly Progress
+
+1. ************************************************Worker Internal Function************************************************
+    1. partitionByPivot 시간 오래 걸리는 이슈를 string concatenation → string buffer를 이용함으로써 해결 및 return value 해결 `worker-function`
+2. **Master Internal Function**
+    1. worker의 sample file이 모두 도착하길 기다렸다가 처리하는 multiple file latch 구현 `file-transfer`
+    2. 여러 개의 file을 한 번에 수신하는 file streaming 구현 `file-transfer`
+    3. setPivot 함수의 sampling 방식 수정 및 sample 중복 제거 `develop`
+    4. worker 별로 생성된 partition file을 관리하는 함수를 생성하였으나, 최종 기능에 필요하지 않아 삭제함 `master-functions`
+3. **Worker-Master Communication**
+    1. server가 아직 열리지 않았을 경우, while 문을 통해 server와 연결이 될 때까지 request를 보내도록 구현 `waiting-server`
+4. **Worker-Worker Communication**
+    1. worker-worker communication 관련 shuffler protobuf 파일 작성 `develop`
+    2. WorkerFileServer, WorkerFileClient object를 Worker로부터 호출하여 Worker-Worker 통신 구현 `develop`
+    3. client-side file streaming 구현 `develop`
+5. **Testing Environment** 
+    1. docker 디렉토리가 있는 root 디렉토리의 code를 가져올 수 있도록 dockerfile 생성 `testing-environment`
+    2. 임시 생성 파일 디렉토리 정리 및 새로 생성한 파일이 비어있는지 assertion으로 확인 `develop`
+
+### 모든 기능 구현 완료
