@@ -20,3 +20,4 @@ sample*
 worker/*
 master/*
 mergedOutput
+output/*

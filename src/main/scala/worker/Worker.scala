@@ -17,7 +17,7 @@ import java.nio.file.{Files, Paths}
 import com.google.protobuf.ByteString
 
 object Worker {
-    def apply(host: String, port: Int): Worker = {
+    def apply(host: String, port: Int, workerPort: Int): Worker = {
         val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build
         val blockingStub = SorterGrpc.blockingStub(channel)
         val newStub = SorterGrpc.stub(channel)
@@ -28,7 +28,8 @@ object Worker {
     def main(args: Array[String]): Unit = {
         val masterEndpoint = args.headOption
         val inputFileDirectory = args.slice(args.indexOf("-I")+1, args.indexOf("-O"))
-        val outputFileDirectory = args.slice(args.indexOf("-O")+1, args.length)
+        val outputFileDirectory = args.slice(args.indexOf("-O")+1, args.length-1)
+        val workerPort = args.last
 
         if (masterEndpoint.isEmpty) {
             System.out.println("Master endpoint is not ready")
@@ -43,7 +44,7 @@ object Worker {
             val masterIPAddress = splitEndpoint(masterEndpoint.get)._1
             val masterPort = splitEndpoint(masterEndpoint.get)._2
             
-            val client = Worker(masterIPAddress, masterPort)
+            val client = Worker(masterIPAddress, masterPort, workerPort.toInt)
             
             try {
                 val succeedRegistration = client.register()
@@ -56,9 +57,9 @@ object Worker {
                     client.sample()
                     client.sendSample()
                     client.partitionByPivot()
-                    client.shuffle()
-                    client.mergeIntoSortedFile(outputFileDirectory.head)
-                    client.mergeDone()
+                    // client.shuffle()
+                    // client.mergeIntoSortedFile(outputFileDirectory.head)
+                    // client.mergeDone()
                 }
                 
             } finally {
@@ -67,7 +68,7 @@ object Worker {
         }
     }
 
-    private val workerPort = 50060
+    // private val workerPort = 50060
 }
 
 class Worker private(
@@ -88,9 +89,9 @@ class Worker private(
     private var workerOrder:Int = -1
     private var workerPivots: List[cs332.protos.sorting.Worker]= null 
     
-    private val pivotLatch: CountDownLatch = new CountDownLatch(1)
+    private val sendSampleLatch: CountDownLatch = new CountDownLatch(1)
     private var shuffleCandidate: List[String] = null
-    private val shufflePath: String = "shuffled"
+    private var shufflePath: String = "shuffled"
     private val mergedOutput: String = "mergedOutput"
     private var partition: Map[String, List[File]] = null
     private var min = "" 
@@ -102,9 +103,9 @@ class Worker private(
     def register(): Boolean = {
         
         // logger.addHandler(fileHandler)
-        val endpoint = myAddress + ":" + myPort
+        
         // val endpoint = myAddress 
-        val request = RegisterRequest(address = endpoint)
+        val request = RegisterRequest(address = myEndpoint)
         try {
             val response = blockingStub.registerWorker(request)
             var registerSuccess = false
@@ -157,7 +158,10 @@ class Worker private(
             new StreamObserver[PivotResponse] {
                 override def onNext(response: PivotResponse): Unit =  {
                     workerPivots = response.workerPivots.toList
-                    pivotLatch.countDown
+                    
+                    print("WORKERPIVOTS " + workerPivots )
+                    print("workerPivots " + workerOrder.toString + " : " + workerPivots(workerOrder) )
+                    sendSampleLatch.countDown
                     assert(workerPivots != null)
                     logger.info(
                             "File upload status :: " + response.status
@@ -190,16 +194,18 @@ class Worker private(
         inputStream.close()
         streamObserver.onCompleted()
         logger.info("SAMPLE : sending sample is done") 
-        pivotLatch.await()
+        sendSampleLatch.await()
     }
 
     def partitionByPivot() = {
         partition = WorkerJob.partitionByPivot(workerPivots, workerOrder)
+        println("PARTITION LENGTH: " + partition.toList.length.toString + " PARTITION: " + partition )
     }
 
     def shuffle() = {
         val shuffledFiles:List[File] = partition.toList(workerOrder)._2
-        val shuffledDir = Util.makeSubdirectory(workerDirectory, shufflePath) + "/"
+        shufflePath = shufflePath + workerOrder.toString
+        val shuffledDir = Util.makeSubdirectory(workerDirectory, shufflePath ) + "/"
         val partitionDir = workerDirectory + "partition" + "/"
         shuffledFiles.foreach{file => Files.move(Paths.get(partitionDir + file.getName), Paths.get(shuffledDir + file.getName))}
         logger.info("SHUFFLE : shuffle is done")
@@ -209,7 +215,7 @@ class Worker private(
         val shuffleFiles = readFilesfromDirectory(workerDirectory + shufflePath)
         
         assert(shuffleFiles != Nil)
-        val finalOutputName = currentDirectory + outputFileDirectory + mergedOutput
+        val finalOutputName = currentDirectory + outputFileDirectory + mergedOutput + workerOrder.toString
         WorkerJob.mergeIntoSortedFile(shuffleFiles, finalOutputName)
         val minMax = WorkerJob.extractMinMaxKey(new File(finalOutputName))
         min = minMax._1
