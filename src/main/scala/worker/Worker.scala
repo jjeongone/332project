@@ -17,18 +17,18 @@ import java.nio.file.{Files, Paths}
 import com.google.protobuf.ByteString
 
 object Worker {
-    def apply(host: String, port: Int, workerPort: Int): Worker = {
+    def apply(host: String, port: Int): Worker = {
         val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build
         val blockingStub = SorterGrpc.blockingStub(channel)
         val newStub = SorterGrpc.stub(channel)
-        new Worker(channel, blockingStub, newStub, workerPort)
+        new Worker(channel, blockingStub, newStub)
     }
 
 
     def main(args: Array[String]): Unit = {
         val masterEndpoint = args.headOption
         val inputFileDirectory = args.slice(args.indexOf("-I")+1, args.indexOf("-O"))
-        val outputFileDirectory = args.slice(args.indexOf("-O")+1, args.length-1)
+        val outputFileDirectory = args.slice(args.indexOf("-O")+1, args.length)
         // val workerPort = args.last
 
         if (masterEndpoint.isEmpty) {
@@ -44,7 +44,7 @@ object Worker {
             val masterIPAddress = splitEndpoint(masterEndpoint.get)._1
             val masterPort = splitEndpoint(masterEndpoint.get)._2
             
-            val client = Worker(masterIPAddress, masterPort, workerPort.toInt)
+            val client = Worker(masterIPAddress, masterPort)
             
             try {
                 val succeedRegistration = client.register()
@@ -68,14 +68,13 @@ object Worker {
         }
     }
 
-    // private val workerPort = 50060
+    private val workerPort = 50060
 }
 
 class Worker private(
     private val channel: ManagedChannel, 
     private val blockingStub: SorterBlockingStub,
-    private val newStub: SorterStub,
-    private val myPort: Int
+    private val newStub: SorterStub
 ) {
     type FileAddress = String
     type WorkerAddress = String
@@ -85,7 +84,7 @@ class Worker private(
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
     // private val fileHandler = Util.createHandler(workerDirectory, "worker.log")
     private val myAddress: WorkerAddress = getIPaddress
-    private val myEndpoint: String = myAddress + ":" + myPort.toInt
+    private val myEndpoint: String = myAddress + ":" + Worker.workerPort
     private var workerOrder:Int = -1
     private var workerPivots: List[cs332.protos.sorting.Worker]= null 
     
