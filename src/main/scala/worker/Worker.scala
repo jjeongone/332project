@@ -2,19 +2,22 @@ package cs332.worker
 
 import java.util.concurrent.TimeUnit
 import java.util.logging.{Level, Logger}
-
-import io.grpc.{StatusRuntimeException, ManagedChannelBuilder, ManagedChannel}
+import io.grpc.{ManagedChannel, ManagedChannelBuilder, StatusRuntimeException}
 
 import java.util.concurrent.CountDownLatch
 import cs332.protos.sorting.SorterGrpc._
 import cs332.protos.sorting._
-import cs332.common.Util.{getIPaddress, currentDirectory, splitEndpoint, readFilesfromDirectory}
+import cs332.common.Util.{currentDirectory, getIPaddress, readFilesfromDirectory, splitEndpoint}
 import cs332.common.Util
 import cs332.worker.WorkerJob._
+
 import java.io.{File, InputStream}
 import io.grpc.stub.StreamObserver
+
 import java.nio.file.{Files, Paths}
 import com.google.protobuf.ByteString
+import worker.client.WorkerFileClient
+import worker.server.WorkerFileServer
 
 object Worker {
     def apply(host: String, port: Int): Worker = {
