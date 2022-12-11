@@ -21,7 +21,7 @@ object MasterJob{
         var pivots = if (rawPivots.size % 2 == 0) rawPivots else rawPivots :+ lines.last.slice(0, 10)
         pivots.updated(pivots.length-1,  lines.last)
 
-        println("LENGTH: " + pivots.length + "PIVOTING FACTOR: " + pivotingFactor.toString + "PIVOTS: " + pivots )
+        // println("LENGTH: " + pivots.length + "PIVOTING FACTOR: " + pivotingFactor.toString + "PIVOTS: " + pivots )
         assert(pivots.length == 2*workers.length)
 
         val result = workers.foldLeft(List[Worker](), pivots)((acc, worker) => {
@@ -29,7 +29,7 @@ object MasterJob{
         })
 
         
-        println("PIVOT SETTT: " + result._1)
+        // println("PIVOT SETTT: " + result._1)
 
         result._1
     }
@@ -60,7 +60,7 @@ object MasterJob{
         }
       }
     }
-    print("workerToMinMaxKey: " + workerToMinMaxKey + "workers: "+ workers)
+    // print("workerToMinMaxKey: " + workerToMinMaxKey + "workers: "+ workers)
     // val workerToMinMaxKeyList = workerToMinMaxKey.toList
     val workerToMinMaxKeySortedList = workerToMinMaxKey.sortWith((elem0, elem1) => elem0._2._2 < elem1._2._2)
     validationWorkerOrderingAux(workerToMinMaxKeySortedList, workers, None)

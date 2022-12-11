@@ -86,7 +86,7 @@ object WorkerJob{
         else getLines(numLines - 1, lines :+ scanner.nextLine())
         }
 
-        def workerToFileName(workerAddress: Address, index: Int): String = partitionPath +  "partition" + workerOrder.toString + "." + index.toString()
+        def workerToFileName(workerAddress: Address, index: Int): String = partitionPath +  "partition" + workerAddress + workerOrder.toString + "." + index.toString()
         def linesToFileContent(lines: List[String]): String = {
             val contentBuffer = new java.lang.StringBuffer()
             lines.foldRight("")((line, acc) => {
@@ -142,6 +142,8 @@ object WorkerJob{
             }
         })
 
+
+
         workers.foldLeft(Map[Address, (List[File], (Int, Int))]())((acc, worker) => {
             mapWorkerToLines.get(worker) match {
             case None => acc
@@ -151,7 +153,7 @@ object WorkerJob{
                 val partitionFiles = listLines.foldRight(scala.collection.immutable.Queue[File]())((lines, acc) => {
                     val linesData = lines._1
                     val linesFileInfo = lines._2
-                    val partitionFile = new File(workerToFileName(worker.address, linesFileInfo._1))
+                    val partitionFile = new File(workerToFileName(workers.indexWhere(worke => worke.address ==  worker.address).toString, linesFileInfo._1))
                     val writerToPartitionFile = new FileWriter(partitionFile, true)
                     writerToPartitionFile.write(linesToFileContent(linesData))
                     writerToPartitionFile.close()

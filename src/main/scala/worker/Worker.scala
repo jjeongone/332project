@@ -29,7 +29,7 @@ object Worker {
         val masterEndpoint = args.headOption
         val inputFileDirectory = args.slice(args.indexOf("-I")+1, args.indexOf("-O"))
         val outputFileDirectory = args.slice(args.indexOf("-O")+1, args.length-1)
-        val workerPort = args.last
+        // val workerPort = args.last
 
         if (masterEndpoint.isEmpty) {
             System.out.println("Master endpoint is not ready")
@@ -57,9 +57,9 @@ object Worker {
                     client.sample()
                     client.sendSample()
                     client.partitionByPivot()
-                    // client.shuffle()
-                    // client.mergeIntoSortedFile(outputFileDirectory.head)
-                    // client.mergeDone()
+                    client.shuffle()
+                    client.mergeIntoSortedFile(outputFileDirectory.head)
+                    client.mergeDone()
                 }
                 
             } finally {
@@ -159,8 +159,8 @@ class Worker private(
                 override def onNext(response: PivotResponse): Unit =  {
                     workerPivots = response.workerPivots.toList
                     
-                    print("WORKERPIVOTS " + workerPivots )
-                    print("workerPivots " + workerOrder.toString + " : " + workerPivots(workerOrder) )
+                    // print("WORKERPIVOTS " + workerPivots )
+                    // print("workerPivots " + workerOrder.toString + " : " + workerPivots(workerOrder) )
                     sendSampleLatch.countDown
                     assert(workerPivots != null)
                     logger.info(
@@ -199,11 +199,11 @@ class Worker private(
 
     def partitionByPivot() = {
         partition = WorkerJob.partitionByPivot(workerPivots, workerOrder)
-        println("PARTITION LENGTH: " + partition.toList.length.toString + " PARTITION: " + partition )
+        // println("PARTITION LENGTH: " + partition.toList.length.toString + " PARTITION: " + partition )
     }
 
     def shuffle() = {
-        val shuffledFiles:List[File] = partition.toList(workerOrder)._2
+        val shuffledFiles:List[File] = partition(myEndpoint)
         shufflePath = shufflePath + workerOrder.toString
         val shuffledDir = Util.makeSubdirectory(workerDirectory, shufflePath ) + "/"
         val partitionDir = workerDirectory + "partition" + "/"

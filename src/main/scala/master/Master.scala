@@ -31,7 +31,7 @@ object Master {
         }
     }
 
-    private val port = 50055
+    private val port = 50059
 
 }
 
