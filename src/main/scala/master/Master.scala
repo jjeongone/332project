@@ -31,7 +31,8 @@ object Master {
         }
     }
 
-    private val port = 50059
+    private val port = 50055
+
 }
 
 class Master(executionContext: ExecutionContext, workerCount: Int) {self => 
@@ -39,17 +40,20 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private val masterDirectory = makeSubdirectory(currentDirectory, "master") + "/"
     
     private val logger = Logger.getLogger(classOf[Master].getName)
+    // private val fileHandler = Util.createHandler(masterDirectory, "master.log")
 
     private val workerLatch: CountDownLatch = new CountDownLatch(workerCount)
+    private val sampleLatch: CountDownLatch = new CountDownLatch(workerCount)
+    private val pivotLatch: CountDownLatch = new CountDownLatch(1)
     private var workers: List[Worker] = List()
-    private var workerDone: List[(String, Pivot)] = List()
-    private var workerPivots: List[Worker] = List()
+    private var workerDone: List[(String, (String, String))] = List()
     private val samplesPath = "sampled"
     private val sortedSamples = "sortedSamples"
-    private val SERVER_PATH = Paths.get(makeSubdirectory(currentDirectory, samplesPath))
+    private val sampleDirectory = Paths.get(makeSubdirectory(masterDirectory, samplesPath) + "/")
 
     private def start(): Unit = {
-        logger.addHandler(Util.createHandler(masterDirectory, "master.log"))
+
+        // logger.addHandler(fileHandler)
 
         server = ServerBuilder.forPort(Master.port).addService(SorterGrpc.bindService(new SorterImpl, executionContext)).build.start
         logger.info("Server has client Count of " + self.workerCount)
@@ -64,6 +68,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private def stop(): Unit = {
         if (server != null) {
             server.shutdown()
+            // fileHandler.close()
         }
     }
     
@@ -89,23 +94,42 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
         workerOrder
     }
 
+    private def calculatePivot(): Unit = {
+        this.synchronized{
+            val sampleFiles = readFilesfromDirectory(sampleDirectory.toString).filter(file => !(file.toString.contains(sortedSamples)))
+
+            if (sampleFiles.length == workerCount) {
+                WorkerJob.mergeIntoSortedFile(sampleFiles, sampleDirectory + sortedSamples)
+                val samplesContent = new File(sampleDirectory + sortedSamples)
+                workers = MasterJob.setPivot(samplesContent, workers)
+                pivotLatch.countDown()
+            }
+        }
+    }
+
+
+
     private def printWorkers(): Unit = {
         val workerAddresses = workers.map(worker => splitEndpoint(worker.address)._1)
         System.out.println(workerAddresses.mkString(", "))
     }
 
-    private def doneWorker(address: String, pivot: Pivot): Unit = {
+    private def doneWorker(address: String, pivot: (String, String)): Unit = {
         this.synchronized{
             workerDone = workerDone.appended((address, pivot))
             if (workerDone.length == workerCount) {
-                // pass workerDone and workers and validation
-                // call function in MasterJob.scala
+                if (MasterJob.validationWorkerOrdering(workerDone, workers)) {
+                    logger.info("MEREGE DONE: workers in fine order")
+                } else {
+                    logger.info("MEREGE DONE: ordering violated between workers")
+                }
                 
                 logger.info("TERMINATE")
                 self.stop()
             }
         }
     }
+
 
     private class SorterImpl extends SorterGrpc.Sorter{
         override def registerWorker(req: RegisterRequest) = {
@@ -120,10 +144,14 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
         }
 
         override def mergeDone(req: DoneRequest) = {
-            doneWorker(req.address, req.pivot.get)
+            val minMax: (String, String) = (req.pivot.get.min, req.pivot.get.max)
+            doneWorker(req.address, minMax)
+            
             val reply = DoneResponse(ok = true)
             Future.successful(reply)
         }
+
+        override def workerFileServerManagement(req: FileServerRequest) = ???
 
         override def getWorkerPivots(responseObserver: StreamObserver[PivotResponse]): StreamObserver[PivotRequest] = {
             new StreamObserver[PivotRequest]() {
@@ -135,7 +163,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 override def onNext(req: PivotRequest): Unit = {
                     val fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
          
-                    writer = getFilePath(SERVER_PATH, fileName)   
+                    writer = getFilePath(sampleDirectory, fileName)   
 
                     writeFile(writer, req.file.get.content.toString("UTF-8"))
                 }    
@@ -147,15 +175,17 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
 
                 override def onCompleted(): Unit = {
                     closeFile(writer)
+                    sampleLatch.countDown()
+
+                    sampleLatch.await()
                     if (Status.IN_PROGRESS.equals(status)) {
                         status = Status.SUCCESS
                     }
-                    val sampleFiles = readFilesfromDirectory(samplesPath).filter(file => !(file.toString.contains(sortedSamples)))
-                    WorkerJob.mergeIntoSortedFile(sampleFiles, SERVER_PATH + "/" + sortedSamples)
-                    val samplesContent = new File(SERVER_PATH + "/" + sortedSamples)
-                    workerPivots = MasterJob.setPivot(samplesContent, workers)
+                    calculatePivot()
+                    pivotLatch.await()
+                    assert(workers.length == workerCount)
                     logger.info("PIVOT : setting pivot is done")
-                    val reply = PivotResponse(status = status, workerPivots = workerPivots)
+                    val reply = PivotResponse(status = status, workerPivots = workers)
 
                     responseObserver.onNext(reply)
                     responseObserver.onCompleted()
@@ -163,13 +193,6 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             }
         }
 
-        override def getPartitionInfo(req: PartitionRequest) = {
-            System.out.println(req)
-            val reply = PartitionResponse(workers = Seq("1", "2", "3"))
-            Future.successful(reply)
-        }
-
-        override def workerFileServerManagement(request: FileServerRequest): Future[FileServerResponse] = ???
 
         private def getFilePath(path: Path, fileName: String): OutputStream = {
             Files.newOutputStream(path.resolve(fileName), StandardOpenOption.CREATE, StandardOpenOption.APPEND)
@@ -189,11 +212,6 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             }
         }
 
-        /** getPartitionInfo
-          * - wait for all workers to send partition info by using CountDownLatch
-          * - get all the information from lists and filter each worker Address from other worker's list -> call user defined function from MasterJob
-          * - redistribute file names to according worker address -> in form of List[(WorkerAddress, List[FileName])]
-          */
 
     }
 }

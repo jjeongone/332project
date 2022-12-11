@@ -37,17 +37,20 @@ class WorkerFileServer(executionContext: ExecutionContext, workerOrder: Int) {se
     }
   }
 
+
   private def stop(): Unit = {
     if (server != null) {
       server.shutdown()
     }
   }
 
+
   private def blockUntilShutdown():Unit = {
     if (server != null) {
       server.awaitTermination()
     }
   }
+
 
   private class ShufflerImpl extends ShufflerGrpc.Shuffler {
     override def registerFileServer(request: RegisterRequest): Future[RegisterResponse] = {
