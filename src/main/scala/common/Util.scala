@@ -4,7 +4,7 @@ import java.net.{DatagramSocket, InetAddress}
 import java.nio.file.{Files, Paths}
 
 import java.util.logging.{Logger, FileHandler, SimpleFormatter}
-import java.io.File
+import java.io.{File, BufferedReader, FileReader}
 
 object Util {
     private[this] val logger = Logger.getLogger("Util")
@@ -57,5 +57,11 @@ object Util {
         val simpleFormatter = new SimpleFormatter()
         fileHandler.setFormatter(simpleFormatter)
         fileHandler
+    }
+
+    def assertEmpty(fileName: String) = {
+        val br: BufferedReader = new BufferedReader(new FileReader(fileName));     
+        assert(br.readLine() != null)
+        br.close()
     }
 }
