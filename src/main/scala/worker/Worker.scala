@@ -106,27 +106,29 @@ class Worker private(
     def register(): Boolean = {
         
         // logger.addHandler(fileHandler)
-        
-        // val endpoint = myAddress 
-        val request = RegisterRequest(address = myEndpoint)
-        try {
-            val response = blockingStub.registerWorker(request)
-            var registerSuccess = false
-            if (response.workerOrder != -1) {
-                workerOrder = response.workerOrder
-                logger.info("REGISTER : success as worker " + workerOrder)
-                registerSuccess = true
+        var registerSuccess = false
+        var successToConnect = false
+        while (!successToConnect) {
+            val request = RegisterRequest(address = myEndpoint)
+            try {
+                val response = blockingStub.registerWorker(request)
+                successToConnect = true
+                if (response.workerOrder != -1) {
+                    workerOrder = response.workerOrder
+                    logger.info("REGISTER : success as worker " + workerOrder)
+                    registerSuccess = true
+                }
+                else {
+                    logger.info("REGISTER : master server registration fail")
+                }
             }
-            else {
-                logger.info("REGISTER : fail")
+            catch {
+                case e: StatusRuntimeException =>
+                    logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
             }
-            registerSuccess
-        } 
-        catch {
-            case e: StatusRuntimeException =>
-            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
-            false
+            Thread.sleep(1000)
         }
+        registerSuccess
     }
 
     def getFilesFromDirectories(inputFileDirectory: Array[FileAddress]): List[File] = {

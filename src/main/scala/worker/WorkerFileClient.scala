@@ -68,6 +68,7 @@ class WorkerFileClient private (private val channel: ManagedChannel, private val
         case e: StatusRuntimeException =>
           logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
       }
+      Thread.sleep(1000)
     }
     successToConnect
   }
