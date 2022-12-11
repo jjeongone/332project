@@ -1,5 +1,34 @@
 # [CSED332] SD Team Project: External Merge Sort 
 
+## How to start program
+### SBT start
+도커 환경일 경우, Worker와 Master에 해당하는 dockerfile을 실행시켜 image를 생성한 뒤 container를 실행시키면 자동으로 sbt를 실행시키기 때문에 이후 `For Master`나 `For Worker` 과정을 바로 실행하면 된다.
+
+도커를 통해 테스트를 진행할 때에는 `Docker Desktop`을 통해 Resource 설정을 해주어야 한다. CPU 4, Memory 16GB, Swap 1GB, Docker Image Size 160GB 상황에서 테스트를 진행하였다.
+
+<br>
+
+로컬이나 서버에서 실행할 경우에는 jvm memory를 설정해주어야 하기 때문에 다음 커멘드를 실행한다.
+
+```bash
+export SBT_OPTS="-Xmx8G -Xms4G -Xss1G"
+```
+
+### For Master
+sbt terminal에서 다음과 같은 커멘드로 Master를 실행시킬 수 있다.
+```bash
+master {WORKER_NUMBER}
+```
+
+### For Worker
+sbt terminal에서 다음과 같은 커멘드로 Worker를 실행시킬 수 있다.
+```bash
+worker {MASTER_IP_ADDRESS}:{MASTER_PORT_NUMBER} -I {INPUT_DIRECTORY} -O {OUTPUT_DIRECTORY}
+```
+현재 `MASTER_PORT_NUMBER` = 50030
+
+<hr>
+
 회의록이나 document에 대해서는 다음 [링크](https://jjeongone.notion.site/CSED322-SD-Team-Project-eb2b3814d554467c93a8c22ec02c53d7)에서 확인하실 수 있습니다. `Document` 디렉토리에는 개발 정보가 저장되어 있고, `Meeting Log` 항목에는 주차별 회의록이 정리되어 있습니다.
 
 ## Week 1
