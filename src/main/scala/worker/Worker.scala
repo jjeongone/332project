@@ -214,7 +214,35 @@ class Worker private(
         val shuffledDir = Util.makeSubdirectory(workerDirectory, shufflePath ) + "/"
         val partitionDir = workerDirectory + "partition" + "/"
         shuffledFiles.foreach{file => Files.move(Paths.get(partitionDir + file.getName), Paths.get(shuffledDir + file.getName))}
-        logger.info("SHUFFLE : shuffle is done")
+        // logger.info("SHUFFLE : shuffle is done")
+        var sendShuffleRequest: Boolean = true
+        val request = FileServerRequest(workerOrder = workerOrder)
+        try {
+            while (sendShuffleRequest) {
+                val response = blockingStub.workerFileServerManagement(request)
+                if (response.status) {
+                    if (response.role == Role.SERVER) {
+                        // start WorkerFileServer
+                        beenFileServer = true
+                        logger.info("SHUFFLE : start as WorkerFileServer " + response.server)
+                    } 
+                    else {
+                        // start WorkerFileClient
+                        logger.info("SHUFFLE : connect to WorkerFileServer " + response.server + " as WorkerFileClient " + workerOrder)
+                    }
+                }
+                else {
+                    sendShuffleRequest = false
+                    logger.info("SHUFFLE : done ")
+                }
+            }
+
+        } 
+        catch {
+            case e: StatusRuntimeException =>
+            logger.log(Level.WARNING, "RPC failed: {0}", e.getStatus)
+            false
+        }
     }   
  
     def mergeIntoSortedFile(outputFileDirectory: String) = {

@@ -79,6 +79,7 @@ message FileServerRequest {
 message FileServerResponse {
   bool status = 1;
   Role role = 2;
+  int32 server = 3;
 }
 
 message DoneRequest {
