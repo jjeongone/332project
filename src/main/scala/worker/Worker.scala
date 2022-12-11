@@ -56,6 +56,7 @@ object Worker {
                     client.sample()
                     client.sendSample()
                     client.partitionByPivot()
+                    client.shuffle()
                     client.mergeIntoSortedFile(outputFileDirectory.head)
                     client.mergeDone()
                 }
@@ -141,12 +142,12 @@ class Worker private(
     
     def externalSort(inputFileDirectory: Array[FileAddress]): Unit = {
         val inputFiles = getFilesFromDirectories(inputFileDirectory)
-        WorkerJob.externalMergeSort(workerDirectory, workerOrder, inputFiles)
+        WorkerJob.externalMergeSort(workerDirectory, workerOrder.toString, inputFiles)
         logger.info("EXTERNAL MERGE SORT : done") 
     }
 
     def sample(): Unit = {
-        WorkerJob.sampling(workerDirectory, workerOrder)
+        WorkerJob.sampling(workerDirectory, workerOrder.toString)
         logger.info("SAMPLE : sampline is done") 
     }
 
@@ -196,7 +197,13 @@ class Worker private(
         partition = WorkerJob.partitionByPivot(workerPivots, workerOrder)
     }
 
-    def shuffle() = ???
+    def shuffle() = {
+        val shuffledFiles:List[File] = partition.toList(workerOrder)._2
+        val shuffledDir = Util.makeSubdirectory(workerDirectory, shufflePath) + "/"
+        val partitionDir = workerDirectory + "partition" + "/"
+        shuffledFiles.foreach{file => Files.move(Paths.get(partitionDir + file.getName), Paths.get(shuffledDir + file.getName))}
+        logger.info("SHUFFLE : shuffle is done")
+    }   
  
     def mergeIntoSortedFile(outputFileDirectory: String) = {
         val shuffleFiles = readFilesfromDirectory(workerDirectory + shufflePath)

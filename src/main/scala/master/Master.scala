@@ -31,7 +31,7 @@ object Master {
         }
     }
 
-    private val port = 50053
+    private val port = 50059
 }
 
 class Master(executionContext: ExecutionContext, workerCount: Int) {self => 
@@ -42,6 +42,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     // private val fileHandler = Util.createHandler(masterDirectory, "master.log")
 
     private val workerLatch: CountDownLatch = new CountDownLatch(workerCount)
+    private val pivotLatch: CountDownLatch = new CountDownLatch(workerCount)
     private var workers: List[Worker] = List()
     private var workerDone: List[(String, (String, String))] = List()
     private val samplesPath = "sampled"
@@ -100,7 +101,6 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
         this.synchronized{
             workerDone = workerDone.appended((address, pivot))
             if (workerDone.length == workerCount) {
-                workers = List(Worker("141.223.214.43:50060",Option(Pivot("AsfAGHM5om","BHgrjaHX2<"))))
                 if (MasterJob.validationWorkerOrdering(workerDone, workers)) {
                     logger.info("MEREGE DONE: workers in fine order")
                 } else {
@@ -155,6 +155,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
 
                 override def onCompleted(): Unit = {
                     closeFile(writer)
+                    pivotLatch.countDown()
                     if (Status.IN_PROGRESS.equals(status)) {
                         status = Status.SUCCESS
                     }
@@ -164,6 +165,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                     val samplesContent = new File(SERVER_PATH + "/" + sortedSamples)
                     workers = MasterJob.setPivot(samplesContent, workers)
                     logger.info("PIVOT : setting pivot is done")
+                    pivotLatch.await()
                     val reply = PivotResponse(status = status, workerPivots = workers)
 
                     responseObserver.onNext(reply)

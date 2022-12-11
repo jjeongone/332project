@@ -11,6 +11,7 @@ import java.util.{Comparator, Scanner}
 import scala.jdk.CollectionConverters._
 import com.google.code.externalsorting.ExternalSort
 import scala.annotation.tailrec
+import cs332.common.Util
 
 object WorkerJob{
     type Key = String
@@ -22,11 +23,13 @@ object WorkerJob{
     val tmpPath4External = "tmp4External"
     val externalSortFile = "testOutput"
     val sampleFile = "sample"
+    val workerDirectory = currentDirectory + "/worker/" 
 
     private[this] val logger = Logger.getLogger(classOf[Worker].getName)
 
-    val outputPath: String = null 
-    val tmpfilesPath: String = null 
+    var outputPath: String = null 
+    var tmpfilesPath: String = null 
+    var partitionPath: String = Util.makeSubdirectory(workerDirectory, "partition") + "/"
 
     def cmp: Comparator[String] = new Comparator[String] {
         override def compare(s1:String, s2:String): Int = {
@@ -58,9 +61,8 @@ object WorkerJob{
     }
     
     def sampling(directory: String, fileType: String): Unit = {
-        assert(outputPath != null)
-        val lines = Source.fromFile(new File(directory + externalSortPath +"/" +  externalSortFile + "." + workerOrder)).getLines().toList
-        val sampleFilename = new File(directory + sampleFile + "." + workerOrder)
+        val lines = Source.fromFile(new File(directory + externalSortPath +"/" +  externalSortFile + "." + fileType)).getLines().toList
+        val sampleFilename = new File(directory + sampleFile + "." + fileType)
         val bw = new BufferedWriter(new FileWriter(sampleFilename))
         val samples = lines.foldLeft((List[Key](), 0))((acc, line) => {
         if (acc._2 % samplingFactor == 0) (acc._1 :+ line.slice(0, 10), acc._2 + 1)
@@ -73,7 +75,8 @@ object WorkerJob{
     }
 
     def partitionByPivot(workers: List[Worker], workerOrder: Int): Map[Address, List[File]] = {
-        val file = new File(outputPath + "/" + externalSortFile)
+   
+        val file = new File(outputPath + "/" + externalSortFile  + "."+ workerOrder.toString)
         val maxNumLines = 10000
         val scanner = new Scanner(file)
 
@@ -83,14 +86,15 @@ object WorkerJob{
         else getLines(numLines - 1, lines :+ scanner.nextLine())
         }
 
-        def workerToFileName(workerAddress: Address, index: Int): String = outputPath + "/" +  "partition" + workerOrder.toString + "." + index.toString()
+        def workerToFileName(workerAddress: Address, index: Int): String = partitionPath +  "partition" + workerOrder.toString + "." + index.toString()
         def linesToFileContent(lines: List[String]): String = {
             val contentBuffer = new java.lang.StringBuffer()
             lines.foldRight("")((line, acc) => {
                 contentBuffer.append(line)
                 contentBuffer.append("\n")
+                line
             })
-            contentBuffer.toString()
+            contentBuffer.toString
         }
     //    val linesFromFile = Source.fromFile(file).getLines()
 
