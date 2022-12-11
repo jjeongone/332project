@@ -6,6 +6,7 @@ WORKDIR /script
 COPY docker/worker/script .
 RUN ls -al
 
+RUN chmod +x generator.sh
 RUN ./generator.sh
 
 
@@ -16,11 +17,8 @@ WORKDIR /code
 
 COPY . .
 
-RUN mkdir input-data
-RUN mkdir output-data
+RUN mkdir data
 
-COPY --from=generator /script/partition* input-data
-
-ENV SBT_OPTS="-Xmx8G -Xms4G -Xss1G"
+COPY --from=generator /script/partition* data/
 
 ENTRYPOINT ["sbt"]
