@@ -58,6 +58,7 @@ object WorkerJob{
         })
         outputPath = makeSubdirectory(directory, externalSortPath) + "/"
         mergeIntoSortedFile(sortedFiles, outputPath  + externalSortFile + "." + workerOrder)
+        Util.assertEmpty(outputPath  + externalSortFile + "." + workerOrder)
     }
     
     def sampling(directory: String, fileType: String): Unit = {
@@ -72,6 +73,7 @@ object WorkerJob{
             bw.write(sample + "\n")
         }
         bw.close()
+        Util.assertEmpty(sampleFilename.toString)
     }
 
     def partitionByPivot(workers: List[Worker], workerOrder: Int): Map[Address, List[File]] = {
@@ -157,6 +159,9 @@ object WorkerJob{
                     val writerToPartitionFile = new FileWriter(partitionFile, true)
                     writerToPartitionFile.write(linesToFileContent(linesData))
                     writerToPartitionFile.close()
+                    
+                    Util.assertEmpty(partitionFile.toString)
+
                     acc :+ partitionFile
                 })
                 acc + (worker.address -> (partitionFiles.toList, listLines.head._2))

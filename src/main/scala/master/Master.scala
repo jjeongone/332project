@@ -31,7 +31,7 @@ object Master {
         }
     }
 
-    private val port = 50055
+    private val port = 50062
 
 }
 
@@ -49,7 +49,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private var workerDone: List[(String, (String, String))] = List()
     private val samplesPath = "sampled"
     private val sortedSamples = "sortedSamples"
-    private val sampleDirectory = Paths.get(makeSubdirectory(masterDirectory, samplesPath) + "/")
+    private val sampleDirectory = Paths.get(makeSubdirectory(masterDirectory, samplesPath))
 
     private def start(): Unit = {
 
@@ -99,9 +99,12 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             val sampleFiles = readFilesfromDirectory(sampleDirectory.toString).filter(file => !(file.toString.contains(sortedSamples)))
 
             if (sampleFiles.length == workerCount) {
-                WorkerJob.mergeIntoSortedFile(sampleFiles, sampleDirectory + sortedSamples)
+                WorkerJob.mergeIntoSortedFile(sampleFiles, sampleDirectory + "/" + sortedSamples)
+                Util.assertEmpty(sampleDirectory + "/" +  sortedSamples)
+
                 val samplesContent = new File(sampleDirectory + sortedSamples)
                 workers = MasterJob.setPivot(samplesContent, workers)
+
                 pivotLatch.countDown()
             }
         }
@@ -158,10 +161,11 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 var writer: OutputStream = null
                 var status: Status = Status.IN_PROGRESS
                 var sampleFileName = null
-
+                var fileName: String = null
+                println("sampleDirectory" + sampleDirectory)
 
                 override def onNext(req: PivotRequest): Unit = {
-                    val fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
+                    fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
          
                     writer = getFilePath(sampleDirectory, fileName)   
 
@@ -176,7 +180,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 override def onCompleted(): Unit = {
                     closeFile(writer)
                     sampleLatch.countDown()
-
+                    Util.assertEmpty(sampleDirectory.toString + "/" + fileName)
                     sampleLatch.await()
                     if (Status.IN_PROGRESS.equals(status)) {
                         status = Status.SUCCESS
