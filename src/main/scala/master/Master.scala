@@ -31,7 +31,8 @@ object Master {
         }
     }
 
-    private val port = 50066
+    private val port = 50030
+
 }
 
 class Master(executionContext: ExecutionContext, workerCount: Int) {self => 
@@ -44,8 +45,9 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private val workerLatch: CountDownLatch = new CountDownLatch(workerCount)
     private val sampleLatch: CountDownLatch = new CountDownLatch(workerCount)
     private val pivotLatch: CountDownLatch = new CountDownLatch(1)
-    private var shuffleLatch: CountDownLatch = new CountDownLatch(workerCount)
+    // private var shuffleLatch: List[CountDownLatch] = List.fill(workerCount)(new CountDownLatch(workerCount))
     
+    private var shuffleLatch: CountDownLatch = new CountDownLatch(workerCount)
     private var workers: List[Worker] = List()
     private var workerDone: List[(String, (String, String))] = List()
     private val samplesPath = "sampled"
@@ -135,6 +137,16 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
         }
     }
 
+    
+    def restoreShuffleLatch() = {
+        this.synchronized{
+            if (serverOrderChecker != workerCount) {
+                shuffleLatch = new CountDownLatch(workerCount)
+
+            }
+        }
+    }
+
 
     private class SorterImpl extends SorterGrpc.Sorter{
         override def registerWorker(req: RegisterRequest) = {
@@ -156,14 +168,6 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             Future.successful(reply)
         }
 
-        def restoreShuffleLatch() = {
-            this.synchronized{
-                if (shuffleLatch.getCount() == 0) {
-                    shuffleLatch = new CountDownLatch(workerCount)
-                }
-            }
-
-        }
 
         override def workerFileServerManagement(req: FileServerRequest) = {
             var status = true
@@ -176,15 +180,19 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             
             if (req.workerOrder == serverOrderChecker) {
                 role = Role.SERVER
-                shuffleLatch.countDown()
                 logger.info("SHUFFLE : Master set FileServer " + serverOrderChecker)
                 serverOrderChecker = serverOrderChecker + 1
             } 
             else {
                 role = Role.CLIENT
-                shuffleLatch.countDown()
             }
+            // var latchCounter = serverOrderChecker
+            // if (req.workerOrder == serverOrderChecker-1) {
+            //     latchCounter = latchCounter -1
+            // }
+            shuffleLatch.countDown()
             shuffleLatch.await()
+            
             val reply = FileServerResponse(status = status, role = role, server = serverOrderChecker-1)
             restoreShuffleLatch()
             Future.successful(reply)

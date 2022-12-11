@@ -96,9 +96,12 @@ class Worker private(
     private var shufflePath: String = "shuffled"
     private val mergedOutput: String = "mergedOutput"
     private var partition: Map[String, List[File]] = null
+    private var workerCount: Int = 2
     private var min = "" 
     private var max = ""
     private var beenFileServer: Boolean = false
+    private var shuffleLatch: CountDownLatch = null
+    private var sendShuffleRequest: Boolean = true
     def shutdown(): Unit = {
         channel.shutdown.awaitTermination(600, TimeUnit.SECONDS)
     }
@@ -165,6 +168,7 @@ class Worker private(
                 override def onNext(response: PivotResponse): Unit =  {
                     workerPivots = response.workerPivots.toList
                     
+                     workerCount = workerPivots.length
                     // print("WORKERPIVOTS " + workerPivots )
                     // print("workerPivots " + workerOrder.toString + " : " + workerPivots(workerOrder) )
                     sendSampleLatch.countDown
@@ -208,6 +212,8 @@ class Worker private(
         // println("PARTITION LENGTH: " + partition.toList.length.toString + " PARTITION: " + partition )
     }
 
+
+
     def shuffle() = {
         val shuffledFiles:List[File] = partition(myEndpoint)
         shufflePath = shufflePath + workerOrder.toString
@@ -215,21 +221,21 @@ class Worker private(
         val partitionDir = workerDirectory + "partition" + "/"
         shuffledFiles.foreach{file => Files.move(Paths.get(partitionDir + file.getName), Paths.get(shuffledDir + file.getName))}
         // logger.info("SHUFFLE : shuffle is done")
-        var sendShuffleRequest: Boolean = true
         val request = FileServerRequest(workerOrder = workerOrder)
         try {
             while (sendShuffleRequest) {
                 val response = blockingStub.workerFileServerManagement(request)
                 if (response.status) {
                     if (response.role == Role.SERVER) {
-                        // start WorkerFileServer
+                        WorkerFileServer.main(workerOrder, workerCount, partition)
                         beenFileServer = true
                         logger.info("SHUFFLE : start as WorkerFileServer " + response.server)
                     } 
                     else {
-                        // start WorkerFileClient
+                        WorkerFileClient.main(splitEndpoint(workerPivots(response.server).address)._1, 8080, myEndpoint, shuffledDir)
                         logger.info("SHUFFLE : connect to WorkerFileServer " + response.server + " as WorkerFileClient " + workerOrder)
                     }
+                    
                 }
                 else {
                     sendShuffleRequest = false

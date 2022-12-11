@@ -1,7 +1,7 @@
 package cs332.common
 
 import java.net.{DatagramSocket, InetAddress}
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Paths, Path}
 
 import java.util.logging.{Logger, FileHandler, SimpleFormatter}
 import java.io.{File, BufferedReader, FileReader}
@@ -22,6 +22,9 @@ object Util {
     def makeSubdirectory(currentDirectory: String, subDirectory: String): String = {
         val newDir = new File(currentDirectory + subDirectory)
         val newPath = newDir.toString()
+        if (Files.exists(Paths.get(newPath))) {
+            new File(newPath).delete()
+        }
         newDir.mkdir()
         // if (newDir.mkdir()) {
         //     logger.info(newPath + "was created successfully")

@@ -14,15 +14,15 @@ import java.nio.file.StandardOpenOption
 
 
 object WorkerFileClient {
-  def apply(host: String, port: Int): WorkerFileClient = {
+  def apply(host: String, port: Int, myEndpoint: String, shuffledDir: String): WorkerFileClient = {
     val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build
     val blockingStub = ShufflerGrpc.blockingStub(channel)
     val newStub = ShufflerGrpc.stub(channel)
-    new WorkerFileClient(channel, blockingStub, newStub, workerFilePort)
+    new WorkerFileClient(channel, blockingStub, newStub, workerFilePort, myEndpoint, shuffledDir)
   }
 
-  def main(ipAddress: String, port: Int): Unit = {
-    val client = WorkerFileClient(ipAddress, port)
+  def main(ipAddress: String, port: Int, myEndpoint: String, shuffledDir: String): Unit = {
+    val client = WorkerFileClient(ipAddress, port,myEndpoint, shuffledDir)
     System.out.println("Connecting to " + ipAddress + ":" + port)
 
     try {
@@ -40,9 +40,12 @@ object WorkerFileClient {
   private val workerFilePort = 8081
 }
 
-class WorkerFileClient private (private val channel: ManagedChannel, private val blockingStub: ShufflerBlockingStub, private val newStub: ShufflerStub, private val myPort: Int) {
+class WorkerFileClient private (private val channel: ManagedChannel, 
+private val blockingStub: ShufflerBlockingStub, private val newStub: ShufflerStub, 
+private val myPort: Int,private val  myEndpoint: String, 
+private val  shuffledDir: String) {
   private [this] val logger = Logger.getLogger(classOf[WorkerFileClient].getName)
-  private val SERVER_PATH = Paths.get("src/main/scala/worker/input")
+  private val SERVER_PATH = Paths.get(shuffledDir)
   private val myAddress = getIPaddress
 
   def shutdown(): Unit = {
@@ -54,7 +57,7 @@ class WorkerFileClient private (private val channel: ManagedChannel, private val
     logger.info("REGISTER : current endpoint " + endpoint)
     var successToConnect = false
     while (!successToConnect) {
-      val req = RegisterRequest(address = endpoint)
+      val req = RegisterRequest(address = myEndpoint)
       try {
         logger.info("REGISTER : try to connecting...")
         val res = blockingStub.registerFileServer(req)
@@ -78,7 +81,7 @@ class WorkerFileClient private (private val channel: ManagedChannel, private val
     var sampleFileName = null
 
     logger.info("Will try to get files from other workers")
-    val request = ShuffleRequest(address = "localhost", count = "2")
+    val request = ShuffleRequest(address = myEndpoint, count = "2")
     try {
       val responses = blockingStub.shuffling(request)
       logger.info("responses" + responses)

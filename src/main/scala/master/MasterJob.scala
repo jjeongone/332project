@@ -60,7 +60,7 @@ object MasterJob{
         }
       }
     }
-    print("workerToMinMaxKey: " + workerToMinMaxKey + "workers: "+ workers)
+    // print("workerToMinMaxKey: " + workerToMinMaxKey + "workers: "+ workers)
     // val workerToMinMaxKeyList = workerToMinMaxKey.toList
     val workerToMinMaxKeySortedList = workerToMinMaxKey.sortWith((elem0, elem1) => elem0._2._2 < elem1._2._2)
     validationWorkerOrderingAux(workerToMinMaxKeySortedList, workers, None)

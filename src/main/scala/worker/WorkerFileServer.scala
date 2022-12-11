@@ -7,16 +7,18 @@ import io.grpc.{Server, ServerBuilder}
 import java.util.logging.{Level, Logger}
 import java.nio.file.{Files, Paths}
 import java.io.InputStream
+import java.util.concurrent.CountDownLatch
 import com.google.protobuf.ByteString
 
+import java.io.{File, InputStream}
 import scala.concurrent.{ExecutionContext, Future}
 
 
 object WorkerFileServer {
   private val logger = Logger.getLogger(classOf[WorkerFileServer].getName)
 
-  def main(workerOrder: Int): Unit = {
-    val server = new WorkerFileServer(ExecutionContext.global, workerOrder)
+  def main(workerOrder: Int, workerCount: Int, partition: Map[String, List[File]]): Unit = {
+    val server = new WorkerFileServer(ExecutionContext.global, workerOrder, workerCount, partition)
     server.start()
     server.blockUntilShutdown()
   }
@@ -24,8 +26,10 @@ object WorkerFileServer {
   private val port = 8080
 }
 
-class WorkerFileServer(executionContext: ExecutionContext, workerOrder: Int) {self =>
+class WorkerFileServer(executionContext: ExecutionContext, workerOrder: Int, workerCount: Int, partition: Map[String, List[File]]) {self =>
   private [this] var server: Server = null
+      private var workerLatch: CountDownLatch = new CountDownLatch(workerCount-1)
+
 
   private def start(): Unit = {
     server = ServerBuilder.forPort(WorkerFileServer.port).addService(ShufflerGrpc.bindService(new ShufflerImpl, executionContext)).build.start
@@ -60,11 +64,11 @@ class WorkerFileServer(executionContext: ExecutionContext, workerOrder: Int) {se
     }
     override def shuffling(request: ShuffleRequest, responseObserver: StreamObserver[ShuffleResponse]): Unit = {
       WorkerFileServer.logger.info("Will try to shuffle files "  + " ...")
-      val pathStrings = List("src/main/scala/worker/input/sample/sample0.1", "src/main/scala/worker/input/sample/sample1.1", "src/main/scala/worker/input/sample/sample2.1")
+      val pathStrings = partition(request.address)
       pathStrings.foldLeft(())((acc, pathString) => {
-        val path = Paths.get(pathString)
+        val path = Paths.get(pathString.toString)
 
-        val fileName = pathString.split('/').last
+        val fileName = pathString.toString.split('/').last
         val metadata = Metadata(fileName = fileName.split('.').head, fileType = fileName.split('.').last, workerOrder = workerOrder)
 
         val inputStream: InputStream = Files.newInputStream(path)
@@ -82,6 +86,9 @@ class WorkerFileServer(executionContext: ExecutionContext, workerOrder: Int) {se
         inputStream.close()
       })
       responseObserver.onCompleted()
+      workerLatch.countDown()
+      workerLatch.await()
+      stop()
     }
   }
 }
