@@ -11,49 +11,18 @@ object MasterJob{
     type Address = String
 
     def setPivot(file: File, workers: List[Worker]): List[Worker] = {
-        val scannerForSize = new Scanner(file)
-        val scanner = new Scanner(file)
-        
-        @tailrec
-        def sizeOfScanner(lineIndex: Int, prevStringOpt: Option[String]): Int = {
-          if (scannerForSize.hasNextLine()) {
-            val line = scannerForSize.nextLine()
-            prevStringOpt match {
-              case None => sizeOfScanner(lineIndex + 1, Some(line))
-              case Some(prevString) => {
-                if (prevString == line) sizeOfScanner(lineIndex, Some(line))
-                else sizeOfScanner(lineIndex + 1, Some(line))
-              }
-            }
-          } else {
-            lineIndex
-          }
+        val lines = Source.fromFile(file).getLines().toList.distinct
+        var pivotingFactor = ((lines.size.toDouble)/(workers.size.toDouble)).ceil.toInt
+        if (pivotingFactor >= lines.length) {
+            pivotingFactor = lines.length -1
         }
+        val rawPivots = lines.foldLeft((List[Key](), 0))((acc, line) => {
+        if (!(acc._2 == 1) && (acc._2 % pivotingFactor == 0 || acc._2 % pivotingFactor == 1)) (acc._1 :+ line.slice(0, 10), acc._2 + 1)
+        else (acc._1, acc._2 +1)
+        })._1
 
-        val sizeOfFile = sizeOfScanner(0, None)
-        var pivotingFactor = ((sizeOfFile.toDouble)/(workers.size.toDouble)).ceil.toInt
-        if (pivotingFactor >= sizeOfFile) {
-            pivotingFactor = sizeOfFile -1
-        }
-
-        @tailrec
-        def setPivotAux(pivots: List[Key], lineIndex: Int, lastLineOpt: Option[String]): (List[Key], String) = {
-          if (scanner.hasNextLine()) {
-            val line = scanner.nextLine()
-            if (!(lineIndex == 1) && (lineIndex % pivotingFactor == 0 || lineIndex % pivotingFactor == 1)) {
-              setPivotAux(pivots :+ line.slice(0, 10), lineIndex + 1, Some(line))
-            } else {
-              setPivotAux(pivots, lineIndex + 1, Some(line))
-            }
-          } else {
-            (pivots, lastLineOpt.get)
-          }
-        }
-
-        val (rawPivots, lastLine) = setPivotAux(List[Key](), 0, None)
-
-        var pivots = if (rawPivots.size % 2 == 0) rawPivots else rawPivots :+ lastLine.slice(0, 10)
-        pivots.updated(pivots.length-1, lastLine)
+        var pivots = if (rawPivots.size % 2 == 0) rawPivots else rawPivots :+ lines.last.slice(0, 10)
+        pivots.updated(pivots.length-1,  lines.last)
 
         // println("LENGTH: " + pivots.length + "PIVOTING FACTOR: " + pivotingFactor.toString + "PIVOTS: " + pivots )
         assert(pivots.length == 2*workers.length)
@@ -61,6 +30,7 @@ object MasterJob{
         val result = workers.foldLeft(List[Worker](), pivots)((acc, worker) => {
         (acc._1 :+ Worker(worker.address, Option(Pivot(acc._2.head, acc._2.tail.head))), acc._2.tail.tail)
         })
+
         
         // println("PIVOT SETTT: " + result._1)
 
