@@ -31,8 +31,7 @@ object Master {
         }
     }
 
-    private val port = 50062
-
+    private val port = 50066
 }
 
 class Master(executionContext: ExecutionContext, workerCount: Int) {self => 
@@ -45,11 +44,14 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
     private val workerLatch: CountDownLatch = new CountDownLatch(workerCount)
     private val sampleLatch: CountDownLatch = new CountDownLatch(workerCount)
     private val pivotLatch: CountDownLatch = new CountDownLatch(1)
+    private var shuffleLatch: CountDownLatch = new CountDownLatch(workerCount)
+    
     private var workers: List[Worker] = List()
     private var workerDone: List[(String, (String, String))] = List()
     private val samplesPath = "sampled"
     private val sortedSamples = "sortedSamples"
     private val sampleDirectory = Paths.get(makeSubdirectory(masterDirectory, samplesPath))
+    private var serverOrderChecker: Int = 0
 
     private def start(): Unit = {
 
@@ -102,7 +104,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 WorkerJob.mergeIntoSortedFile(sampleFiles, sampleDirectory + "/" + sortedSamples)
                 Util.assertEmpty(sampleDirectory + "/" +  sortedSamples)
 
-                val samplesContent = new File(sampleDirectory + sortedSamples)
+                val samplesContent = new File(sampleDirectory + "/" + sortedSamples)
                 workers = MasterJob.setPivot(samplesContent, workers)
 
                 pivotLatch.countDown()
@@ -154,7 +156,39 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
             Future.successful(reply)
         }
 
-        override def workerFileServerManagement(req: FileServerRequest) = ???
+        def restoreShuffleLatch() = {
+            this.synchronized{
+                if (shuffleLatch.getCount() == 0) {
+                    shuffleLatch = new CountDownLatch(workerCount)
+                }
+            }
+
+        }
+
+        override def workerFileServerManagement(req: FileServerRequest) = {
+            var status = true
+            var role: Role = null
+            
+            if (serverOrderChecker == workerCount) {
+                status = false
+                logger.info("SHUFFLE : shuffling need to be done")
+            }
+            
+            if (req.workerOrder == serverOrderChecker) {
+                role = Role.SERVER
+                shuffleLatch.countDown()
+                logger.info("SHUFFLE : Master set FileServer " + serverOrderChecker)
+                serverOrderChecker = serverOrderChecker + 1
+            } 
+            else {
+                role = Role.CLIENT
+                shuffleLatch.countDown()
+            }
+            shuffleLatch.await()
+            val reply = FileServerResponse(status = status, role = role, server = serverOrderChecker-1)
+            restoreShuffleLatch()
+            Future.successful(reply)
+        }
 
         override def getWorkerPivots(responseObserver: StreamObserver[PivotResponse]): StreamObserver[PivotRequest] = {
             new StreamObserver[PivotRequest]() {
@@ -162,7 +196,7 @@ class Master(executionContext: ExecutionContext, workerCount: Int) {self =>
                 var status: Status = Status.IN_PROGRESS
                 var sampleFileName = null
                 var fileName: String = null
-                println("sampleDirectory" + sampleDirectory)
+                // println("sampleDirectory" + sampleDirectory)
 
                 override def onNext(req: PivotRequest): Unit = {
                     fileName = req.metadata.get.fileName + "." + req.metadata.get.fileType
